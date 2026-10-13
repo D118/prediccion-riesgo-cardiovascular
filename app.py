@@ -1,17 +1,65 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import pickle
 import tensorflow as tf
+import base64
 
+# ==========================================
+# CONFIGURACIÓN DE LA PÁGINA
+# ==========================================
 st.set_page_config(
     page_title="Predicción de Riesgo Cardiovascular",
     page_icon="🫀",
     layout="wide"
 )
 
+# ==========================================
+# FONDO CON IMAGEN + OVERLAY
+# ==========================================
+with open("fondo1.jpg", "rb") as f:
+    img_data = f.read()
+img_base64 = base64.b64encode(img_data).decode()
+
+st.markdown(f"""
+<style>
+    .stApp {{
+        background-image: 
+            linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+            url("data:image/jpg;base64,{img_base64}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    
+    h1, h2, h3, p, label, .stMarkdown, .stCaption {{
+        color: #ffffff !important;
+    }}
+    
+    .stNumberInput label, .stSelectbox label {{
+        color: #ffffff !important;
+        font-weight: bold;
+    }}
+    
+    .stNumberInput input, .stSelectbox select {{
+        background-color: rgba(255, 255, 255, 0.92) !important;
+        color: #000000 !important;
+    }}
+    
+    .stMetric label, .stMetric div {{
+        color: #ffffff !important;
+    }}
+    
+    .stProgress > div > div > div > div {{
+        background-color: #4CAF50 !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# CARGAR MODELOS Y RECURSOS
+# ==========================================
 @st.cache_resource
 def cargar_recursos():
     modelo_prob = tf.keras.models.load_model('modelo_probabilidad.keras')
@@ -25,16 +73,24 @@ def cargar_recursos():
 
 modelo_prob, modelos_ensemble, scaler, columnas = cargar_recursos()
 
+# ==========================================
+# TÍTULO
+# ==========================================
 st.title("🫀 Predicción de Riesgo Cardiovascular")
 st.markdown("---")
 st.write("""
 Esta aplicación utiliza **redes neuronales artificiales** para estimar:
 - La **probabilidad** de riesgo cardiovascular (regresión)
 - La **categoría** de riesgo (Bajo / Medio / Alto)
+
+Ingrese los datos clínicos del paciente y presione **Predecir**.
 """)
 st.markdown("---")
 
-st.header("Datos del Paciente")
+# ==========================================
+# FORMULARIO
+# ==========================================
+st.header("📋 Datos del Paciente")
 
 with st.form("formulario_paciente"):
     col1, col2, col3 = st.columns(3)
@@ -58,6 +114,9 @@ with st.form("formulario_paciente"):
     st.markdown("---")
     boton = st.form_submit_button("Predecir", use_container_width=True)
 
+# ==========================================
+# PREDICCIÓN
+# ==========================================
 if boton:
     datos_dict = {
         'age': age,
@@ -81,9 +140,11 @@ if boton:
     df_input = df_input.reindex(columns=columnas, fill_value=0)
     datos_escalados = scaler.transform(df_input)
     
+    # --- Modelo de probabilidad ---
     prob = modelo_prob.predict(datos_escalados, verbose=0)[0][0]
     porcentaje = prob * 100
     
+    # --- Ensemble de categoría ---
     predicciones_ens = []
     for m in modelos_ensemble:
         predicciones_ens.append(m.predict(datos_escalados, verbose=0))
@@ -93,8 +154,11 @@ if boton:
     categoria = categorias[cat_idx]
     confianza = promedio_ens[0][cat_idx] * 100
     
+    # ==========================================
+    # MOSTRAR RESULTADOS
+    # ==========================================
     st.markdown("---")
-    st.header("Resultado de la Predicción")
+    st.header("📊 Resultado de la Predicción")
     
     col_r1, col_r2 = st.columns(2)
     
@@ -122,5 +186,8 @@ if boton:
     with st.expander("Ver datos ingresados"):
         st.dataframe(df_input.T.rename(columns={0: "Valor"}))
 
+# ==========================================
+# PIE DE PÁGINA
+# ==========================================
 st.markdown("---")
-st.caption("Proyecto académico - Universidad de Córdoba - Ingeniería de Sistemas - 2026-2")
+st.caption("Proyecto académico - Universidad de Córdoba - Facultad de Ingeniería - Ingeniería de Sistemas - 2026-2")

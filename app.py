@@ -226,20 +226,6 @@ st.markdown(f"""
         color: {color_texto};
         font-size: 0.92rem;
     }}
-
-    /* Barras de probabilidad */
-    .barra-container {{
-        background: {color_card_bg};
-        border-radius: 8px;
-        padding: 4px;
-        border: 1px solid {color_card_border};
-        margin-bottom: 4px;
-    }}
-    .barra-fill {{
-        height: 24px;
-        border-radius: 6px;
-        transition: width 0.3s;
-    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -417,9 +403,6 @@ if boton:
             categoria = categorias[cat_idx]
             confianza = promedio_ens[0][cat_idx] * 100
             
-            # Porcentajes de las 3 categorías
-            probs_3cat = promedio_ens[0] * 100
-            
             # Factores de riesgo heurísticos
             factores = []
             if age > 60:
@@ -486,28 +469,6 @@ if boton:
             """, unsafe_allow_html=True)
         
         st.progress(float(prob))
-        
-        # --- Distribución de probabilidades por categoría (barras manuales) ---
-        st.markdown("### Distribución de Probabilidades por Categoría")
-        
-        colores_cat = {"Bajo": "#4CAF50", "Medio": "#FF9800", "Alto": "#E74C3C"}
-        
-        for i, cat in enumerate(categorias):
-            prob_cat = probs_3cat[i]
-            color_barra = colores_cat[cat]
-            
-            col_a, col_b = st.columns([1, 4])
-            with col_a:
-                st.markdown(f"**{cat}**")
-            with col_b:
-                st.markdown(f"""
-                <div class="barra-container">
-                    <div class="barra-fill" style="background: {color_barra}; width: {prob_cat}%;"></div>
-                </div>
-                <div style="color: {color_texto_secundario}; font-size: 0.85rem; margin-top: 2px;">
-                    {prob_cat:.2f}%
-                </div>
-                """, unsafe_allow_html=True)
         
         # --- Interpretación ---
         st.markdown("### Interpretación")

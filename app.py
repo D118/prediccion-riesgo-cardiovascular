@@ -30,7 +30,7 @@ if "modo_oscuro" not in st.session_state:
 # ==========================================
 with st.sidebar:
     try:
-        st.image("logou.png", use_container_width=True)
+        st.image("logou.jpg", use_container_width=True)
     except Exception:
         st.markdown("### Universidad de Córdoba")
 

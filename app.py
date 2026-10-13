@@ -5,7 +5,6 @@ import joblib
 import pickle
 import tensorflow as tf
 import base64
-import plotly.graph_objects as go
 from datetime import datetime
 
 # ==========================================
@@ -30,10 +29,10 @@ if "modo_oscuro" not in st.session_state:
 # BARRA LATERAL
 # ==========================================
 with st.sidebar:
-    st.markdown("## 📋 Información del Proyecto")
+    st.markdown("## Información del Proyecto")
     st.markdown("---")
 
-    st.markdown("### 👥 Integrantes")
+    st.markdown("### Integrantes")
     st.markdown("""
     - Dilan Estiven Ortega Pinzón
     - Juan David Andrade Llanos
@@ -41,7 +40,7 @@ with st.sidebar:
     """)
 
     st.markdown("---")
-    st.markdown("### 🎓 Información Académica")
+    st.markdown("### Información Académica")
     st.markdown("""
     - **Programa:** Ingeniería de Sistemas
     - **Facultad:** Facultad de Ingeniería
@@ -52,7 +51,7 @@ with st.sidebar:
     """)
 
     st.markdown("---")
-    st.markdown("### 📝 Descripción")
+    st.markdown("### Descripción")
     st.caption("""
     Sistema de predicción de riesgo cardiovascular basado en redes neuronales artificiales. 
     Utiliza un dataset de 70,000 registros clínicos con 12 variables para clasificar a los 
@@ -60,8 +59,8 @@ with st.sidebar:
     """)
 
     st.markdown("---")
-    st.markdown("### ⚙️ Preferencias")
-    modo = st.toggle("🌙 Modo oscuro", value=st.session_state.modo_oscuro)
+    st.markdown("### Preferencias")
+    modo = st.toggle("Modo oscuro", value=st.session_state.modo_oscuro)
     if modo != st.session_state.modo_oscuro:
         st.session_state.modo_oscuro = modo
         st.rerun()
@@ -172,14 +171,10 @@ st.markdown(f"""
         text-align: center;
         margin-bottom: 15px;
     }}
-    .tarjeta-resultado .icono {{
-        font-size: 3rem;
-        margin-bottom: 5px;
-    }}
     .tarjeta-resultado .titulo {{
         font-size: 1.1rem;
         color: {color_texto_secundario};
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }}
     .tarjeta-resultado .valor {{
         font-size: 2.2rem;
@@ -248,7 +243,7 @@ st.markdown("""
         letter-spacing: 0.5px;
         text-align: center;
     ">
-        🫀 Predicción de Riesgo Cardiovascular
+        Predicción de Riesgo Cardiovascular
     </h1>
     <p style="
         color: #a8d5e5;
@@ -320,7 +315,7 @@ if boton:
         st.error(f"Por favor complete todos los campos. Faltan: {', '.join(campos_faltantes)}")
     else:
         # Spinner de carga
-        with st.spinner("🔬 Analizando datos del paciente..."):
+        with st.spinner("Analizando datos del paciente..."):
             gender_map = {"Hombre": "Male", "Mujer": "Female"}
             married_map = {"Sí": "Yes", "No": "No"}
             work_map = {
@@ -378,15 +373,15 @@ if boton:
             # Factores de riesgo heurísticos
             factores = []
             if age > 60:
-                factores.append(f"Edad avanzada ({age} años, >60)")
+                factores.append(f"Edad avanzada ({age} años, mayor a 60)")
             if hypertension == 1:
                 factores.append("Hipertensión arterial")
             if heart_disease == 1:
                 factores.append("Enfermedad cardíaca previa")
             if avg_glucose > 140:
-                factores.append(f"Glucosa elevada ({avg_glucose:.1f} mg/dL, >140)")
+                factores.append(f"Glucosa elevada ({avg_glucose:.1f} mg/dL, mayor a 140)")
             if bmi > 30:
-                factores.append(f"IMC elevado ({bmi:.1f} kg/m², >30)")
+                factores.append(f"IMC elevado ({bmi:.1f} kg/m², mayor a 30)")
             if smoking_map[smoking] == "smokes":
                 factores.append("Tabaquismo activo")
             elif smoking_map[smoking] == "formerly smoked":
@@ -396,7 +391,7 @@ if boton:
         # GUARDAR EN HISTORIAL
         # ==========================================
         st.session_state.historial.append({
-            "Fecha": datetime.now().strftime("%H:%M:%S"),
+            "Hora": datetime.now().strftime("%H:%M:%S"),
             "Edad": age,
             "Sexo": gender,
             "IMC": f"{bmi:.1f}",
@@ -411,20 +406,19 @@ if boton:
         st.markdown("---")
         st.header("Resultado de la Predicción")
         
-        # --- Tarjetas con iconos ---
+        # --- Tarjetas ---
         if categoria == "Bajo":
-            icono, color = "🟢", "#4CAF50"
+            color = "#4CAF50"
         elif categoria == "Medio":
-            icono, color = "🟡", "#FF9800"
+            color = "#FF9800"
         else:
-            icono, color = "🔴", "#E74C3C"
+            color = "#E74C3C"
         
         col_r1, col_r2 = st.columns(2)
         
         with col_r1:
             st.markdown(f"""
             <div class="tarjeta-resultado">
-                <div class="icono">📊</div>
                 <div class="titulo">Probabilidad de Riesgo</div>
                 <div class="valor">{porcentaje:.2f}%</div>
             </div>
@@ -433,7 +427,6 @@ if boton:
         with col_r2:
             st.markdown(f"""
             <div class="tarjeta-resultado">
-                <div class="icono">{icono}</div>
                 <div class="titulo">Categoría de Riesgo</div>
                 <div class="valor" style="color: {color};">{categoria.upper()}</div>
                 <div style="font-size: 0.85rem; color: {color_texto_secundario};">
@@ -444,32 +437,15 @@ if boton:
         
         st.progress(float(prob))
         
-        # --- Gráfico de barras horizontal con los 3 porcentajes ---
+        # --- Gráfico de barras horizontal con los 3 porcentajes (st.bar_chart nativo) ---
         st.markdown("### Distribución de Probabilidades por Categoría")
         
-        fig = go.Figure(go.Bar(
-            x=probs_3cat,
-            y=['Bajo', 'Medio', 'Alto'],
-            orientation='h',
-            marker=dict(color=['#4CAF50', '#FF9800', '#E74C3C']),
-            text=[f"{p:.1f}%" for p in probs_3cat],
-            textposition='outside',
-            hovertemplate='%{y}: %{x:.2f}%<extra></extra>'
-        ))
+        df_grafico = pd.DataFrame({
+            "Categoría": ["Bajo", "Medio", "Alto"],
+            "Probabilidad": probs_3cat
+        }).set_index("Categoría")
         
-        fig.update_layout(
-            xaxis=dict(range=[0, 105], title="Probabilidad (%)", 
-                       gridcolor='rgba(128,128,128,0.2)'),
-            yaxis=dict(title=""),
-            height=250,
-            margin=dict(l=20, r=20, t=20, b=20),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color=color_texto, size=13),
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+        st.bar_chart(df_grafico, horizontal=True, color="#1A5276")
         
         # --- Interpretación ---
         st.markdown("### Interpretación")
@@ -484,9 +460,9 @@ if boton:
         st.markdown("### Factores de Riesgo Identificados")
         if factores:
             for f in factores:
-                st.markdown(f'<div class="factor-item">⚠️ {f}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="factor-item">{f}</div>', unsafe_allow_html=True)
         else:
-            st.success("✅ No se identificaron factores de riesgo clínicos relevantes.")
+            st.success("No se identificaron factores de riesgo clínicos relevantes.")
         
         # --- Datos ingresados ---
         with st.expander("Ver datos ingresados"):
@@ -497,11 +473,11 @@ if boton:
 # ==========================================
 if st.session_state.historial:
     st.markdown("---")
-    st.header("📋 Historial de Predicciones (Sesión Actual)")
+    st.header("Historial de Predicciones (Sesión Actual)")
     df_hist = pd.DataFrame(st.session_state.historial)
     st.dataframe(df_hist, use_container_width=True)
     
-    if st.button("🗑️ Limpiar historial"):
+    if st.button("Limpiar historial"):
         st.session_state.historial = []
         st.rerun()
 
@@ -510,7 +486,7 @@ if st.session_state.historial:
 # ==========================================
 st.markdown("""
 <div class="disclaimer">
-    ⚕️ <strong>Aviso médico:</strong> Esta herramienta es un proyecto académico desarrollado 
+    <strong>Aviso médico:</strong> Esta herramienta es un proyecto académico desarrollado 
     con fines educativos. No reemplaza la evaluación, diagnóstico o tratamiento de un profesional 
     de la salud. Los resultados son estimaciones basadas en un modelo de redes neuronales y no 
     deben interpretarse como diagnóstico clínico. Consulte siempre a un médico ante cualquier 

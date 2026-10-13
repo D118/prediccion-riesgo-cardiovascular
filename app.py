@@ -16,6 +16,39 @@ st.set_page_config(
 )
 
 # ==========================================
+# BARRA LATERAL CON INFORMACIÓN DEL PROYECTO
+# ==========================================
+with st.sidebar:
+    st.markdown("## 📋 Información del Proyecto")
+    st.markdown("---")
+
+    st.markdown("### 👥 Integrantes")
+    st.markdown("""
+    - Dilan Estiven Ortega Pinzón
+    - Juan David Andrade Llanos
+    - Andrés Camilo Gonzalez Echavarria
+    """)
+
+    st.markdown("---")
+    st.markdown("### 🎓 Información Académica")
+    st.markdown("""
+    - **Programa:** Ingeniería de Sistemas
+    - **Facultad:** Facultad de Ingeniería
+    - **Universidad:** Universidad de Córdoba
+    - **Periodo:** 2026-2
+    - **Asignatura:** Simulación
+    - **Docente:** Luis Garcia Cuida
+    """)
+
+    st.markdown("---")
+    st.markdown("### 📝 Descripción")
+    st.caption("""
+    Sistema de predicción de riesgo cardiovascular basado en redes neuronales artificiales. 
+    Utiliza un dataset de 70,000 registros clínicos con 12 variables para clasificar a los 
+    pacientes en dos categorías: sano o con riesgo cardiovascular.
+    """)
+
+# ==========================================
 # FONDO CON IMAGEN + OVERLAY
 # ==========================================
 with open("fondo1.png", "rb") as f:
@@ -54,6 +87,37 @@ st.markdown(f"""
     .stProgress > div > div > div > div {{
         background-color: #4CAF50 !important;
     }}
+
+    /* ===== ESTILOS PARA LA SIDEBAR ===== */
+    section[data-testid="stSidebar"] {{
+        background-color: rgba(10, 25, 47, 0.95) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }}
+    
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] li,
+    section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] .stCaption {{
+        color: #ffffff !important;
+    }}
+
+    section[data-testid="stSidebar"] hr {{
+        border-color: rgba(255, 255, 255, 0.2);
+    }}
+
+    /* ===== ESTILOS PARA EXPANDER ===== */
+    .streamlit-expanderHeader {{
+        color: #ffffff !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }}
+    
+    .streamlit-expanderContent {{
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #ffffff !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,18 +138,49 @@ def cargar_recursos():
 modelo_prob, modelos_ensemble, scaler, columnas = cargar_recursos()
 
 # ==========================================
-# TÍTULO
+# BANNER SUPERIOR
 # ==========================================
-st.title("Predicción de Riesgo Cardiovascular")
-st.markdown("---")
-st.write("""
-Esta aplicación utiliza redes neuronales artificiales para estimar:
-- La probabilidad de riesgo cardiovascular (regresión)
-- La categoría de riesgo (Bajo / Medio / Alto)
-
-Complete todos los campos del formulario y presione Predecir.
-""")
-st.markdown("---")
+st.markdown("""
+<div style="
+    background: linear-gradient(135deg, rgba(10, 37, 64, 0.95) 0%, rgba(26, 82, 118, 0.95) 100%);
+    border-radius: 18px;
+    padding: 35px 40px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+">
+    <h1 style="
+        color: #ffffff;
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-align: center;
+    ">
+        🫀 Predicción de Riesgo Cardiovascular
+    </h1>
+    <p style="
+        color: #a8d5e5;
+        margin-top: 12px;
+        margin-bottom: 0;
+        font-size: 1.1rem;
+        text-align: center;
+        font-style: italic;
+    ">
+        Proyecto de Simulación — Redes Neuronales Artificiales
+    </p>
+    <p style="
+        color: #d0e8f2;
+        margin-top: 18px;
+        margin-bottom: 0;
+        font-size: 0.95rem;
+        text-align: center;
+    ">
+        Sistema basado en redes neuronales artificiales que estima la probabilidad y la categoría 
+        de riesgo cardiovascular (Bajo / Medio / Alto) a partir de datos clínicos del paciente.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # FORMULARIO

@@ -230,7 +230,7 @@ modelo_prob, modelos_ensemble, scaler, columnas = cargar_recursos()
 # ==========================================
 st.markdown("""
 <div style="
-    background: linear-gradient(135deg, rgba(10, 37, 64, 0.95) 0%, rgba(26, 82, 118, 0.95) 100%);
+    background: linear-gradient(135deg, #0A2540 0%, #1A5276 100%);
     border-radius: 18px;
     padding: 35px 40px;
     margin-bottom: 30px;
@@ -238,7 +238,7 @@ st.markdown("""
     border: 1px solid rgba(255, 255, 255, 0.15);
 ">
     <h1 style="
-        color: #ffffff;
+        color: #ffffff !important;
         margin: 0;
         font-size: 2.2rem;
         font-weight: 700;
@@ -248,7 +248,7 @@ st.markdown("""
         Predicción de Riesgo Cardiovascular
     </h1>
     <p style="
-        color: #a8d5e5;
+        color: #a8d5e5 !important;
         margin-top: 12px;
         margin-bottom: 0;
         font-size: 1.1rem;
@@ -258,7 +258,7 @@ st.markdown("""
         Proyecto de Simulación — Redes Neuronales Artificiales
     </p>
     <p style="
-        color: #d0e8f2;
+        color: #d0e8f2 !important;
         margin-top: 18px;
         margin-bottom: 0;
         font-size: 0.95rem;

@@ -226,19 +226,32 @@ def cargar_recursos():
 modelo_prob, modelos_ensemble, scaler, columnas = cargar_recursos()
 
 # ==========================================
-# BANNER SUPERIOR
+# BANNER SUPERIOR (adaptado al modo)
 # ==========================================
-st.markdown("""
+if st.session_state.modo_oscuro:
+    banner_bg = "linear-gradient(135deg, #0A2540 0%, #1A5276 100%)"
+    banner_titulo = "#ffffff"
+    banner_subtitulo = "#a8d5e5"
+    banner_desc = "#d0e8f2"
+    banner_border = "rgba(255, 255, 255, 0.15)"
+else:
+    banner_bg = "linear-gradient(135deg, #E8F0F8 0%, #D0E0F0 100%)"
+    banner_titulo = "#0A2540"
+    banner_subtitulo = "#1A5276"
+    banner_desc = "#2C3E50"
+    banner_border = "rgba(10, 25, 47, 0.15)"
+
+st.markdown(f"""
 <div style="
-    background: linear-gradient(135deg, #0A2540 0%, #1A5276 100%);
+    background: {banner_bg};
     border-radius: 18px;
     padding: 35px 40px;
     margin-bottom: 30px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    border: 1px solid {banner_border};
 ">
     <h1 style="
-        color: #ffffff !important;
+        color: {banner_titulo} !important;
         margin: 0;
         font-size: 2.2rem;
         font-weight: 700;
@@ -248,7 +261,7 @@ st.markdown("""
         Predicción de Riesgo Cardiovascular
     </h1>
     <p style="
-        color: #a8d5e5 !important;
+        color: {banner_subtitulo} !important;
         margin-top: 12px;
         margin-bottom: 0;
         font-size: 1.1rem;
@@ -258,7 +271,7 @@ st.markdown("""
         Proyecto de Simulación — Redes Neuronales Artificiales
     </p>
     <p style="
-        color: #d0e8f2 !important;
+        color: {banner_desc} !important;
         margin-top: 18px;
         margin-bottom: 0;
         font-size: 0.95rem;

@@ -5,18 +5,29 @@ import joblib
 import pickle
 import tensorflow as tf
 import base64
+import plotly.graph_objects as go
+from datetime import datetime
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
 st.set_page_config(
     page_title="Predicción de Riesgo Cardiovascular",
-    page_icon=None,
+    page_icon="🫀",
     layout="wide"
 )
 
 # ==========================================
-# BARRA LATERAL CON INFORMACIÓN DEL PROYECTO
+# ESTADO DE SESIÓN
+# ==========================================
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+
+if "modo_oscuro" not in st.session_state:
+    st.session_state.modo_oscuro = True
+
+# ==========================================
+# BARRA LATERAL
 # ==========================================
 with st.sidebar:
     st.markdown("## 📋 Información del Proyecto")
@@ -48,50 +59,83 @@ with st.sidebar:
     pacientes en dos categorías: sano o con riesgo cardiovascular.
     """)
 
-# ==========================================
-# FONDO CON IMAGEN + OVERLAY
-# ==========================================
-with open("fondo1.png", "rb") as f:
-    img_data = f.read()
-img_base64 = base64.b64encode(img_data).decode()
+    st.markdown("---")
+    st.markdown("### ⚙️ Preferencias")
+    modo = st.toggle("🌙 Modo oscuro", value=st.session_state.modo_oscuro)
+    if modo != st.session_state.modo_oscuro:
+        st.session_state.modo_oscuro = modo
+        st.rerun()
 
-st.markdown(f"""
-<style>
-    .stApp {{
+# ==========================================
+# FONDO CON IMAGEN + OVERLAY (SOLO MODO OSCURO)
+# ==========================================
+try:
+    with open("fondo1.png", "rb") as f:
+        img_data = f.read()
+    img_base64 = base64.b64encode(img_data).decode()
+    fondo_css = f"""
         background-image: 
             linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
             url("data:image/jpg;base64,{img_base64}");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
+    """
+except FileNotFoundError:
+    fondo_css = "background-color: #0A192F;"
+
+# ==========================================
+# ESTILOS DINÁMICOS SEGÚN MODO
+# ==========================================
+if st.session_state.modo_oscuro:
+    color_texto = "#ffffff"
+    color_texto_secundario = "#a8d5e5"
+    color_sidebar_bg = "rgba(10, 25, 47, 0.95)"
+    color_card_bg = "rgba(255, 255, 255, 0.08)"
+    color_card_border = "rgba(255, 255, 255, 0.15)"
+    color_input_bg = "rgba(255, 255, 255, 0.92)"
+    color_input_text = "#000000"
+else:
+    color_texto = "#0A192F"
+    color_texto_secundario = "#1A5276"
+    color_sidebar_bg = "rgba(240, 244, 248, 0.98)"
+    color_card_bg = "rgba(255, 255, 255, 0.95)"
+    color_card_border = "rgba(10, 25, 47, 0.15)"
+    color_input_bg = "rgba(255, 255, 255, 1.0)"
+    color_input_text = "#000000"
+    fondo_css = "background-color: #F0F4F8;"
+
+st.markdown(f"""
+<style>
+    .stApp {{
+        {fondo_css}
     }}
     
     h1, h2, h3, p, label, .stMarkdown, .stCaption {{
-        color: #ffffff !important;
+        color: {color_texto} !important;
     }}
     
     .stNumberInput label, .stSelectbox label {{
-        color: #ffffff !important;
+        color: {color_texto} !important;
         font-weight: bold;
     }}
     
     .stNumberInput input, .stSelectbox select {{
-        background-color: rgba(255, 255, 255, 0.92) !important;
-        color: #000000 !important;
+        background-color: {color_input_bg} !important;
+        color: {color_input_text} !important;
     }}
     
     .stMetric label, .stMetric div {{
-        color: #ffffff !important;
+        color: {color_texto} !important;
     }}
     
     .stProgress > div > div > div > div {{
         background-color: #4CAF50 !important;
     }}
 
-    /* ===== ESTILOS PARA LA SIDEBAR ===== */
     section[data-testid="stSidebar"] {{
-        background-color: rgba(10, 25, 47, 0.95) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: {color_sidebar_bg} !important;
+        border-right: 1px solid {color_card_border};
     }}
     
     section[data-testid="stSidebar"] h1,
@@ -101,22 +145,69 @@ st.markdown(f"""
     section[data-testid="stSidebar"] li,
     section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] .stCaption {{
-        color: #ffffff !important;
+        color: {color_texto} !important;
     }}
 
     section[data-testid="stSidebar"] hr {{
-        border-color: rgba(255, 255, 255, 0.2);
+        border-color: {color_card_border};
     }}
 
-    /* ===== ESTILOS PARA EXPANDER ===== */
     .streamlit-expanderHeader {{
-        color: #ffffff !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: {color_texto} !important;
+        background-color: {color_card_bg} !important;
     }}
     
     .streamlit-expanderContent {{
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: #ffffff !important;
+        background-color: {color_card_bg} !important;
+        color: {color_texto} !important;
+    }}
+
+    /* Tarjetas de resultado */
+    .tarjeta-resultado {{
+        background: {color_card_bg};
+        border-radius: 16px;
+        padding: 25px;
+        border: 1px solid {color_card_border};
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        text-align: center;
+        margin-bottom: 15px;
+    }}
+    .tarjeta-resultado .icono {{
+        font-size: 3rem;
+        margin-bottom: 5px;
+    }}
+    .tarjeta-resultado .titulo {{
+        font-size: 1.1rem;
+        color: {color_texto_secundario};
+        margin-bottom: 5px;
+    }}
+    .tarjeta-resultado .valor {{
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: {color_texto};
+    }}
+
+    /* Disclaimer */
+    .disclaimer {{
+        background: {color_card_bg};
+        border-left: 4px solid #D4AF37;
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin-top: 30px;
+        font-size: 0.85rem;
+        color: {color_texto_secundario};
+        font-style: italic;
+    }}
+
+    /* Factores de riesgo */
+    .factor-item {{
+        background: {color_card_bg};
+        border-radius: 8px;
+        padding: 8px 14px;
+        margin: 4px 0;
+        border-left: 3px solid #E74C3C;
+        color: {color_texto};
+        font-size: 0.92rem;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -213,7 +304,6 @@ with st.form("formulario_paciente"):
 # PREDICCIÓN
 # ==========================================
 if boton:
-    # 1. Verificar que TODOS los campos estén llenos
     campos_faltantes = []
     if age is None: campos_faltantes.append("Edad")
     if gender is None: campos_faltantes.append("Sexo")
@@ -229,61 +319,91 @@ if boton:
     if campos_faltantes:
         st.error(f"Por favor complete todos los campos. Faltan: {', '.join(campos_faltantes)}")
     else:
-        # 2. Mapear los valores en español a los que espera el modelo (inglés)
-        gender_map = {"Hombre": "Male", "Mujer": "Female"}
-        married_map = {"Sí": "Yes", "No": "No"}
-        work_map = {
-            "Privado": "Private",
-            "Independiente": "Self-employed",
-            "Empleado público": "Govt_job",
-            "Niño/a": "children",
-            "Nunca ha trabajado": "Never_worked"
-        }
-        residence_map = {"Urbana": "Urban", "Rural": "Rural"}
-        smoking_map = {
-            "Nunca ha fumado": "never smoked",
-            "Fumó anteriormente": "formerly smoked",
-            "Fuma actualmente": "smokes",
-            "Desconocido": "Unknown"
-        }
+        # Spinner de carga
+        with st.spinner("🔬 Analizando datos del paciente..."):
+            gender_map = {"Hombre": "Male", "Mujer": "Female"}
+            married_map = {"Sí": "Yes", "No": "No"}
+            work_map = {
+                "Privado": "Private",
+                "Independiente": "Self-employed",
+                "Empleado público": "Govt_job",
+                "Niño/a": "children",
+                "Nunca ha trabajado": "Never_worked"
+            }
+            residence_map = {"Urbana": "Urban", "Rural": "Rural"}
+            smoking_map = {
+                "Nunca ha fumado": "never smoked",
+                "Fumó anteriormente": "formerly smoked",
+                "Fuma actualmente": "smokes",
+                "Desconocido": "Unknown"
+            }
+            
+            datos_dict = {
+                'age': age,
+                'hypertension': hypertension,
+                'heart_disease': heart_disease,
+                'avg_glucose_level': avg_glucose,
+                'bmi': bmi,
+                'gender_Male': 1 if gender_map[gender] == "Male" else 0,
+                'ever_married_Yes': 1 if married_map[ever_married] == "Yes" else 0,
+                'work_type_Never_worked': 1 if work_map[work_type] == "Never_worked" else 0,
+                'work_type_Private': 1 if work_map[work_type] == "Private" else 0,
+                'work_type_Self-employed': 1 if work_map[work_type] == "Self-employed" else 0,
+                'work_type_children': 1 if work_map[work_type] == "children" else 0,
+                'Residence_type_Urban': 1 if residence_map[residence] == "Urban" else 0,
+                'smoking_status_formerly smoked': 1 if smoking_map[smoking] == "formerly smoked" else 0,
+                'smoking_status_never smoked': 1 if smoking_map[smoking] == "never smoked" else 0,
+                'smoking_status_smokes': 1 if smoking_map[smoking] == "smokes" else 0,
+            }
+            
+            df_input = pd.DataFrame([datos_dict])
+            df_input = df_input.reindex(columns=columnas, fill_value=0)
+            datos_escalados = scaler.transform(df_input)
+            
+            prob = modelo_prob.predict(datos_escalados, verbose=0)[0][0]
+            porcentaje = prob * 100
+            
+            predicciones_ens = []
+            for m in modelos_ensemble:
+                predicciones_ens.append(m.predict(datos_escalados, verbose=0))
+            promedio_ens = np.mean(predicciones_ens, axis=0)
+            cat_idx = np.argmax(promedio_ens, axis=1)[0]
+            categorias = ['Bajo', 'Medio', 'Alto']
+            categoria = categorias[cat_idx]
+            confianza = promedio_ens[0][cat_idx] * 100
+            
+            # Porcentajes de las 3 categorías
+            probs_3cat = promedio_ens[0] * 100
+            
+            # Factores de riesgo heurísticos
+            factores = []
+            if age > 60:
+                factores.append(f"Edad avanzada ({age} años, >60)")
+            if hypertension == 1:
+                factores.append("Hipertensión arterial")
+            if heart_disease == 1:
+                factores.append("Enfermedad cardíaca previa")
+            if avg_glucose > 140:
+                factores.append(f"Glucosa elevada ({avg_glucose:.1f} mg/dL, >140)")
+            if bmi > 30:
+                factores.append(f"IMC elevado ({bmi:.1f} kg/m², >30)")
+            if smoking_map[smoking] == "smokes":
+                factores.append("Tabaquismo activo")
+            elif smoking_map[smoking] == "formerly smoked":
+                factores.append("Historial de tabaquismo")
         
-        # 3. Construir el diccionario de datos
-        datos_dict = {
-            'age': age,
-            'hypertension': hypertension,
-            'heart_disease': heart_disease,
-            'avg_glucose_level': avg_glucose,
-            'bmi': bmi,
-            'gender_Male': 1 if gender_map[gender] == "Male" else 0,
-            'ever_married_Yes': 1 if married_map[ever_married] == "Yes" else 0,
-            'work_type_Never_worked': 1 if work_map[work_type] == "Never_worked" else 0,
-            'work_type_Private': 1 if work_map[work_type] == "Private" else 0,
-            'work_type_Self-employed': 1 if work_map[work_type] == "Self-employed" else 0,
-            'work_type_children': 1 if work_map[work_type] == "children" else 0,
-            'Residence_type_Urban': 1 if residence_map[residence] == "Urban" else 0,
-            'smoking_status_formerly smoked': 1 if smoking_map[smoking] == "formerly smoked" else 0,
-            'smoking_status_never smoked': 1 if smoking_map[smoking] == "never smoked" else 0,
-            'smoking_status_smokes': 1 if smoking_map[smoking] == "smokes" else 0,
-        }
-        
-        # 4. Preprocesar y predecir
-        df_input = pd.DataFrame([datos_dict])
-        df_input = df_input.reindex(columns=columnas, fill_value=0)
-        datos_escalados = scaler.transform(df_input)
-        
-        # Modelo de probabilidad
-        prob = modelo_prob.predict(datos_escalados, verbose=0)[0][0]
-        porcentaje = prob * 100
-        
-        # Ensemble de categoría
-        predicciones_ens = []
-        for m in modelos_ensemble:
-            predicciones_ens.append(m.predict(datos_escalados, verbose=0))
-        promedio_ens = np.mean(predicciones_ens, axis=0)
-        cat_idx = np.argmax(promedio_ens, axis=1)[0]
-        categorias = ['Bajo', 'Medio', 'Alto']
-        categoria = categorias[cat_idx]
-        confianza = promedio_ens[0][cat_idx] * 100
+        # ==========================================
+        # GUARDAR EN HISTORIAL
+        # ==========================================
+        st.session_state.historial.append({
+            "Fecha": datetime.now().strftime("%H:%M:%S"),
+            "Edad": age,
+            "Sexo": gender,
+            "IMC": f"{bmi:.1f}",
+            "Glucosa": f"{avg_glucose:.1f}",
+            "Probabilidad": f"{porcentaje:.2f}%",
+            "Categoría": categoria
+        })
         
         # ==========================================
         # MOSTRAR RESULTADOS
@@ -291,21 +411,67 @@ if boton:
         st.markdown("---")
         st.header("Resultado de la Predicción")
         
+        # --- Tarjetas con iconos ---
+        if categoria == "Bajo":
+            icono, color = "🟢", "#4CAF50"
+        elif categoria == "Medio":
+            icono, color = "🟡", "#FF9800"
+        else:
+            icono, color = "🔴", "#E74C3C"
+        
         col_r1, col_r2 = st.columns(2)
         
         with col_r1:
-            st.metric(label="Probabilidad de Riesgo", value=f"{porcentaje:.2f}%")
+            st.markdown(f"""
+            <div class="tarjeta-resultado">
+                <div class="icono">📊</div>
+                <div class="titulo">Probabilidad de Riesgo</div>
+                <div class="valor">{porcentaje:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col_r2:
-            if categoria == "Bajo":
-                st.success(f"RIESGO {categoria.upper()} (confianza: {confianza:.1f}%)")
-            elif categoria == "Medio":
-                st.warning(f"RIESGO {categoria.upper()} (confianza: {confianza:.1f}%)")
-            else:
-                st.error(f"RIESGO {categoria.upper()} (confianza: {confianza:.1f}%)")
+            st.markdown(f"""
+            <div class="tarjeta-resultado">
+                <div class="icono">{icono}</div>
+                <div class="titulo">Categoría de Riesgo</div>
+                <div class="valor" style="color: {color};">{categoria.upper()}</div>
+                <div style="font-size: 0.85rem; color: {color_texto_secundario};">
+                    Confianza: {confianza:.1f}%
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.progress(float(prob))
         
+        # --- Gráfico de barras horizontal con los 3 porcentajes ---
+        st.markdown("### Distribución de Probabilidades por Categoría")
+        
+        fig = go.Figure(go.Bar(
+            x=probs_3cat,
+            y=['Bajo', 'Medio', 'Alto'],
+            orientation='h',
+            marker=dict(color=['#4CAF50', '#FF9800', '#E74C3C']),
+            text=[f"{p:.1f}%" for p in probs_3cat],
+            textposition='outside',
+            hovertemplate='%{y}: %{x:.2f}%<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            xaxis=dict(range=[0, 105], title="Probabilidad (%)", 
+                       gridcolor='rgba(128,128,128,0.2)'),
+            yaxis=dict(title=""),
+            height=250,
+            margin=dict(l=20, r=20, t=20, b=20),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color=color_texto, size=13),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # --- Interpretación ---
         st.markdown("### Interpretación")
         if categoria == "Bajo":
             st.info("El paciente tiene bajo riesgo cardiovascular. Se recomienda mantener hábitos saludables.")
@@ -314,8 +480,43 @@ if boton:
         else:
             st.error("El paciente tiene alto riesgo cardiovascular. Se recomienda evaluación médica inmediata.")
         
+        # --- Factores de riesgo ---
+        st.markdown("### Factores de Riesgo Identificados")
+        if factores:
+            for f in factores:
+                st.markdown(f'<div class="factor-item">⚠️ {f}</div>', unsafe_allow_html=True)
+        else:
+            st.success("✅ No se identificaron factores de riesgo clínicos relevantes.")
+        
+        # --- Datos ingresados ---
         with st.expander("Ver datos ingresados"):
             st.dataframe(df_input.T.rename(columns={0: "Valor"}))
+
+# ==========================================
+# HISTORIAL DE PREDICCIONES
+# ==========================================
+if st.session_state.historial:
+    st.markdown("---")
+    st.header("📋 Historial de Predicciones (Sesión Actual)")
+    df_hist = pd.DataFrame(st.session_state.historial)
+    st.dataframe(df_hist, use_container_width=True)
+    
+    if st.button("🗑️ Limpiar historial"):
+        st.session_state.historial = []
+        st.rerun()
+
+# ==========================================
+# DISCLAIMER MÉDICO
+# ==========================================
+st.markdown("""
+<div class="disclaimer">
+    ⚕️ <strong>Aviso médico:</strong> Esta herramienta es un proyecto académico desarrollado 
+    con fines educativos. No reemplaza la evaluación, diagnóstico o tratamiento de un profesional 
+    de la salud. Los resultados son estimaciones basadas en un modelo de redes neuronales y no 
+    deben interpretarse como diagnóstico clínico. Consulte siempre a un médico ante cualquier 
+    duda sobre su salud cardiovascular.
+</div>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # PIE DE PÁGINA

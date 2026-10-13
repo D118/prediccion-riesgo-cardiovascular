@@ -54,8 +54,10 @@ with st.sidebar:
     st.markdown("### Descripción")
     st.caption("""
     Sistema de predicción de riesgo cardiovascular basado en redes neuronales artificiales. 
-    Utiliza un dataset de 70,000 registros clínicos con 12 variables para clasificar a los 
-    pacientes en dos categorías: sano o con riesgo cardiovascular.
+    Utiliza un dataset de 5,110 registros clínicos con 16 variables predictoras para estimar 
+    la probabilidad de riesgo (regresión) y clasificar al paciente en tres categorías: 
+    Bajo, Medio o Alto. Emplea un ensemble de 5 modelos con data augmentation para mejorar 
+    la precisión del sistema.
     """)
 
     st.markdown("---")

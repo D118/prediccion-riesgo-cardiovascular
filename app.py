@@ -18,7 +18,7 @@ st.set_page_config(
 # ==========================================
 # FONDO CON IMAGEN + OVERLAY
 # ==========================================
-with open("fondo1.jpg", "rb") as f:
+with open("fondo1.png", "rb") as f:
     img_data = f.read()
 img_base64 = base64.b64encode(img_data).decode()
 

@@ -27,7 +27,6 @@ except:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# Memoria para el Aprendizaje por Refuerzo (Few-Shot dinámico)
 if "ejemplos_exitosos" not in st.session_state:
     st.session_state.ejemplos_exitosos = []
 if "feedback_dado" not in st.session_state:
@@ -49,7 +48,6 @@ def generar_recomendacion_llm(categoria, factores, edad, sexo):
         for ej in st.session_state.ejemplos_exitosos[-2:]: 
             instruccion_rl += f"- \"{ej}\"\n"
 
-    # AQUI ESTÁ EL CAMBIO: Sin títulos médicos
     prompt = f"""
     Actúa como un asistente virtual de salud muy amable, empático y cercano. 
     Tu tarea es generar un consejo o recomendación basándote en estos datos clínicos:
@@ -454,9 +452,7 @@ if boton:
             df_input = df_input.reindex(columns=columnas, fill_value=0)
             datos_escalados = scaler.transform(df_input)
             
-            prob = modelo_prob.predict(datos_escalados, verbose=0)[0][0]
-            porcentaje = prob * 100
-            
+            # Usamos el ensemble para determinar la categoría y probabilidad
             predicciones_ens = []
             for m in modelos_ensemble:
                 predicciones_ens.append(m.predict(datos_escalados, verbose=0))
@@ -465,6 +461,16 @@ if boton:
             categorias = ['Bajo', 'Medio', 'Alto']
             categoria = categorias[cat_idx]
             confianza = promedio_ens[0][cat_idx] * 100
+            
+            # Calculamos la probabilidad basándonos en la categoría y la confianza
+            if categoria == "Bajo":
+                prob = (confianza / 100) * 0.33
+            elif categoria == "Medio":
+                prob = 0.33 + ((confianza / 100) * 0.33)
+            else:
+                prob = 0.66 + ((confianza / 100) * 0.34)
+                
+            porcentaje = prob * 100
             
             # Factores de riesgo heurísticos
             factores = []

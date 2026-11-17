@@ -35,7 +35,7 @@ if "feedback_dado" not in st.session_state:
     st.session_state.feedback_dado = False
 
 def generar_recomendacion_llm(categoria, factores, edad, sexo):
-    """Genera una recomendación médica con LLM (Groq/Llama 3)."""
+    """Genera una recomendación médica con LLM (Groq)."""
     contexto_paciente = f"Paciente de {edad} años, sexo {sexo}. "
     contexto_paciente += f"Clasificación de riesgo cardiovascular: {categoria}. "
     
@@ -66,13 +66,13 @@ def generar_recomendacion_llm(categoria, factores, edad, sexo):
     
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b", # Modelo actualizado
             messages=[
                 {"role": "system", "content": "Eres un asistente médico experto en prevención cardiovascular."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=300,
+            max_tokens=1024, # Tokens aumentados
         )
         return completion.choices[0].message.content
     except Exception as e:

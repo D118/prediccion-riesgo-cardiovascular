@@ -49,29 +49,30 @@ def generar_recomendacion_llm(categoria, factores, edad, sexo):
         for ej in st.session_state.ejemplos_exitosos[-2:]: 
             instruccion_rl += f"- \"{ej}\"\n"
 
-    # AQUI ESTÁ EL CAMBIO: PROMPT MÁS HUMANO Y SENCILLO
+    # AQUI ESTÁ EL CAMBIO: Sin títulos médicos
     prompt = f"""
-    Actúa como un médico de cabecera muy amable, empático y cercano. 
-    Tienes que darle una recomendación a tu paciente basándote en esto:
+    Actúa como un asistente virtual de salud muy amable, empático y cercano. 
+    Tu tarea es generar un consejo o recomendación basándote en estos datos clínicos:
     {contexto_paciente}
     {instruccion_rl}
     
     Reglas ESTRICTAS para tu respuesta:
-    1. Háblale de "tú" (o "usted" si es mayor de 60 años), de forma cálida y tranquila. Que no parezca un robot.
-    2. EXPLICA LAS COSAS EN PALABRAS SENCILLAS. No uses términos médicos complicados (por ejemplo, en vez de decir "dislipidemia", di "colesterol alto"; en vez de "evento cardiovascular", di "problemas del corazón").
-    3. Dale 2 o 3 consejos prácticos y realistas que pueda aplicar en su día a día (ej. caminar, cambiar la dieta, descansar).
-    4. El texto debe tener más de 200 caracteres, pero no debe ser un testamento. Máximo 4 o 5 oraciones.
-    5. No uses viñetas ni formato Markdown, solo texto corrido en un párrafo.
+    1. NO digas "soy tu médico" ni te asignes títulos médicos. Eres un sistema de apoyo. Puedes iniciar con un saludo cálido o refiriéndote directamente al paciente.
+    2. Háblale de "tú" (o "usted" si es mayor de 60 años), de forma cálida y tranquila. Que no parezca un robot.
+    3. EXPLICA LAS COSAS EN PALABRAS SENCILLAS. No uses términos médicos complicados (por ejemplo, en vez de decir "dislipidemia", di "colesterol alto"; en vez de "evento cardiovascular", di "problemas del corazón").
+    4. Dale 2 o 3 consejos prácticos y realistas que pueda aplicar en su día a día (ej. caminar, cambiar la dieta, descansar).
+    5. El texto debe tener más de 200 caracteres, pero no debe ser un testamento. Máximo 4 o 5 oraciones.
+    6. No uses viñetas ni formato Markdown, solo texto corrido en un párrafo.
     """
     
     try:
         completion = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[
-                {"role": "system", "content": "Eres un médico de familia empático y muy bueno explicando la salud en palabras sencillas."},
+                {"role": "system", "content": "Eres un asistente virtual de salud empático y muy bueno explicando la salud en palabras sencillas."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.8, # Un poco más de creatividad para que suene más natural
+            temperature=0.8, 
             max_tokens=1024,
         )
         return completion.choices[0].message.content

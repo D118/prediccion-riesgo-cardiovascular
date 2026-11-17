@@ -20,11 +20,10 @@ st.set_page_config(
 # ==========================================
 # CONFIGURACIÓN LLM (GROQ) Y RL
 # ==========================================
-# Lee la clave de forma segura desde Streamlit Secrets
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 except:
-    GROQ_API_KEY = "FALTA_CONFIGURAR_SECRET" # Si no está en Secrets, avisará
+    GROQ_API_KEY = "FALTA_CONFIGURAR_SECRET"
 
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -35,44 +34,45 @@ if "feedback_dado" not in st.session_state:
     st.session_state.feedback_dado = False
 
 def generar_recomendacion_llm(categoria, factores, edad, sexo):
-    """Genera una recomendación médica con LLM (Groq)."""
+    """Genera una recomendación médica humanizada con LLM (Groq)."""
     contexto_paciente = f"Paciente de {edad} años, sexo {sexo}. "
-    contexto_paciente += f"Clasificación de riesgo cardiovascular: {categoria}. "
+    contexto_paciente += f"Nivel de riesgo cardiovascular: {categoria}. "
     
     if factores:
-        contexto_paciente += f"Factores de riesgo detectados: {', '.join(factores)}. "
+        contexto_paciente += f"Algunos puntos a mejorar: {', '.join(factores)}. "
     else:
-        contexto_paciente += "No se detectaron factores de riesgo clínicos graves. "
+        contexto_paciente += "El paciente no tiene factores de riesgo graves. "
 
-    # APLICACIÓN DEL RL: Inyectamos feedback positivo previo
     instruccion_rl = ""
     if st.session_state.ejemplos_exitosos:
         instruccion_rl = "Ten en cuenta que a los usuarios les han gustado recomendaciones con este estilo:\n"
         for ej in st.session_state.ejemplos_exitosos[-2:]: 
             instruccion_rl += f"- \"{ej}\"\n"
 
+    # AQUI ESTÁ EL CAMBIO: PROMPT MÁS HUMANO Y SENCILLO
     prompt = f"""
-    Eres un médico cardiólogo experto. Basado en estos datos clínicos:
+    Actúa como un médico de cabecera muy amable, empático y cercano. 
+    Tienes que darle una recomendación a tu paciente basándote en esto:
     {contexto_paciente}
-    
-    Genera una recomendación médica personalizada y empática.
     {instruccion_rl}
     
-    Reglas ESTRICTAS:
-    1. El texto DEBE tener más de 200 caracteres (aprox. 3 o 4 oraciones).
-    2. No uses formato Markdown, solo texto plano.
-    3. Sé claro y directo, pero mantén un tono profesional y tranquilizador.
+    Reglas ESTRICTAS para tu respuesta:
+    1. Háblale de "tú" (o "usted" si es mayor de 60 años), de forma cálida y tranquila. Que no parezca un robot.
+    2. EXPLICA LAS COSAS EN PALABRAS SENCILLAS. No uses términos médicos complicados (por ejemplo, en vez de decir "dislipidemia", di "colesterol alto"; en vez de "evento cardiovascular", di "problemas del corazón").
+    3. Dale 2 o 3 consejos prácticos y realistas que pueda aplicar en su día a día (ej. caminar, cambiar la dieta, descansar).
+    4. El texto debe tener más de 200 caracteres, pero no debe ser un testamento. Máximo 4 o 5 oraciones.
+    5. No uses viñetas ni formato Markdown, solo texto corrido en un párrafo.
     """
     
     try:
         completion = client.chat.completions.create(
-            model="openai/gpt-oss-120b", # Modelo actualizado
+            model="openai/gpt-oss-120b",
             messages=[
-                {"role": "system", "content": "Eres un asistente médico experto en prevención cardiovascular."},
+                {"role": "system", "content": "Eres un médico de familia empático y muy bueno explicando la salud en palabras sencillas."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            max_tokens=1024, # Tokens aumentados
+            temperature=0.8, # Un poco más de creatividad para que suene más natural
+            max_tokens=1024,
         )
         return completion.choices[0].message.content
     except Exception as e:
@@ -394,7 +394,7 @@ with st.form("formulario_paciente"):
     boton = st.form_submit_button("Predecir", use_container_width=True)
 
 # ==========================================
-# PREDICCIÓN
+# PREDICCIÓN Y LÓGICA DE ESTADO
 # ==========================================
 if boton:
     campos_faltantes = []
@@ -482,9 +482,21 @@ if boton:
             elif smoking_map[smoking] == "formerly smoked":
                 factores.append("Historial de tabaquismo")
         
-        # ==========================================
-        # GUARDAR EN HISTORIAL
-        # ==========================================
+        # Guardar TODO en la sesión para que no se borre al dar clic en feedback
+        st.session_state.resultado_prediccion = {
+            "prob": prob,
+            "porcentaje": porcentaje,
+            "categoria": categoria,
+            "confianza": confianza,
+            "factores": factores,
+            "df_input": df_input,
+            "age": age,
+            "gender": gender,
+            "bmi": bmi,
+            "avg_glucose": avg_glucose
+        }
+        
+        # Guardar en historial
         st.session_state.historial.append({
             "Hora": datetime.now().strftime("%H:%M:%S"),
             "Edad": age,
@@ -499,109 +511,111 @@ if boton:
         if "recomendacion_actual" in st.session_state:
             del st.session_state.recomendacion_actual
         st.session_state.feedback_dado = False
+        st.rerun() # Recargamos para mostrar los resultados guardados
 
-        # ==========================================
-        # MOSTRAR RESULTADOS
-        # ==========================================
-        st.markdown("---")
-        st.header("Resultado de la Predicción")
-        
-        # --- Tarjetas ---
-        if categoria == "Bajo":
-            color = "#4CAF50"
-        elif categoria == "Medio":
-            color = "#FF9800"
-        else:
-            color = "#E74C3C"
-        
-        col_r1, col_r2 = st.columns(2)
-        
-        with col_r1:
-            st.markdown(f"""
-            <div class="tarjeta-resultado">
-                <div class="titulo">Probabilidad de Riesgo</div>
-                <div class="valor">{porcentaje:.2f}%</div>
+# ==========================================
+# MOSTRAR RESULTADOS (Lee del estado de sesión)
+# ==========================================
+if "resultado_prediccion" in st.session_state:
+    res = st.session_state.resultado_prediccion
+    
+    st.markdown("---")
+    st.header("Resultado de la Predicción")
+    
+    # --- Tarjetas ---
+    if res['categoria'] == "Bajo":
+        color = "#4CAF50"
+    elif res['categoria'] == "Medio":
+        color = "#FF9800"
+    else:
+        color = "#E74C3C"
+    
+    col_r1, col_r2 = st.columns(2)
+    
+    with col_r1:
+        st.markdown(f"""
+        <div class="tarjeta-resultado">
+            <div class="titulo">Probabilidad de Riesgo</div>
+            <div class="valor">{res['porcentaje']:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_r2:
+        st.markdown(f"""
+        <div class="tarjeta-resultado">
+            <div class="titulo">Categoría de Riesgo</div>
+            <div class="valor" style="color: {color};">{res['categoria'].upper()}</div>
+            <div style="font-size: 0.85rem; color: {color_texto_secundario};">
+                Confianza: {res['confianza']:.1f}%
             </div>
-            """, unsafe_allow_html=True)
-        
-        with col_r2:
-            st.markdown(f"""
-            <div class="tarjeta-resultado">
-                <div class="titulo">Categoría de Riesgo</div>
-                <div class="valor" style="color: {color};">{categoria.upper()}</div>
-                <div style="font-size: 0.85rem; color: {color_texto_secundario};">
-                    Confianza: {confianza:.1f}%
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.progress(float(prob))
-        
-        # --- Interpretación ---
-        st.markdown("### Interpretación")
-        if categoria == "Bajo":
-            st.info("El paciente tiene bajo riesgo cardiovascular. Se recomienda mantener hábitos saludables.")
-        elif categoria == "Medio":
-            st.warning("El paciente tiene riesgo moderado. Se recomienda consulta médica y seguimiento.")
-        else:
-            st.error("El paciente tiene alto riesgo cardiovascular. Se recomienda evaluación médica inmediata.")
-        
-        # --- Factores de riesgo ---
-        st.markdown("### Factores de Riesgo Identificados")
-        if factores:
-            for f in factores:
-                st.markdown(f'<div class="factor-item">{f}</div>', unsafe_allow_html=True)
-        else:
-            st.success("No se identificaron factores de riesgo clínicos relevantes.")
-        
-        # --- Datos ingresados ---
-        with st.expander("Ver datos ingresados"):
-            st.dataframe(df_input.T.rename(columns={0: "Valor"}))
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.progress(float(res['prob']))
+    
+    # --- Interpretación ---
+    st.markdown("### Interpretación")
+    if res['categoria'] == "Bajo":
+        st.info("El paciente tiene bajo riesgo cardiovascular. Se recomienda mantener hábitos saludables.")
+    elif res['categoria'] == "Medio":
+        st.warning("El paciente tiene riesgo moderado. Se recomienda consulta médica y seguimiento.")
+    else:
+        st.error("El paciente tiene alto riesgo cardiovascular. Se recomienda evaluación médica inmediata.")
+    
+    # --- Factores de riesgo ---
+    st.markdown("### Factores de Riesgo Identificados")
+    if res['factores']:
+        for f in res['factores']:
+            st.markdown(f'<div class="factor-item">{f}</div>', unsafe_allow_html=True)
+    else:
+        st.success("No se identificaron factores de riesgo clínicos relevantes.")
+    
+    # --- Datos ingresados ---
+    with st.expander("Ver datos ingresados"):
+        st.dataframe(res['df_input'].T.rename(columns={0: "Valor"}))
 
-        # ==========================================
-        # NUEVO: SECCIÓN LLM + RL (RECOMENDACIÓN)
-        # ==========================================
-        st.markdown("---")
-        st.header("🩺 Recomendación Médica Generada por IA")
-        st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
-        
-        if "recomendacion_actual" not in st.session_state:
-            with st.spinner("Generando recomendación personalizada con IA..."):
-                st.session_state.recomendacion_actual = generar_recomendacion_llm(
-                    categoria, factores, age, gender
-                )
-                st.session_state.feedback_dado = False
+    # ==========================================
+    # SECCIÓN LLM + RL (RECOMENDACIÓN)
+    # ==========================================
+    st.markdown("---")
+    st.header("🩺 Recomendación Médica Generada por IA")
+    st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
+    
+    if "recomendacion_actual" not in st.session_state:
+        with st.spinner("Generando recomendación personalizada con IA..."):
+            st.session_state.recomendacion_actual = generar_recomendacion_llm(
+                res['categoria'], res['factores'], res['age'], res['gender']
+            )
+            st.session_state.feedback_dado = False
 
-        # Mostrar la recomendación
-        st.info(st.session_state.recomendacion_actual)
+    # Mostrar la recomendación
+    st.info(st.session_state.recomendacion_actual)
 
-        # Mostrar longitud (para verificar requisito del profe de >200)
-        st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
+    # Mostrar longitud
+    st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
 
-        # SISTEMA DE FEEDBACK (RL)
-        st.markdown("#### ¿Qué tan útil fue esta recomendación?")
-        
-        if not st.session_state.feedback_dado:
-            col_f1, col_f2, _ = st.columns([1, 1, 4])
-            with col_f1:
-                if st.button("👍 Útil", use_container_width=True):
-                    # RECOMPENSA POSITIVA: Guardamos en memoria para el RL
-                    st.session_state.ejemplos_exitosos.append(st.session_state.recomendacion_actual)
-                    st.session_state.feedback_dado = True
-                    st.rerun()
-            with col_f2:
-                if st.button("👎 No útil", use_container_width=True):
-                    # CASTIGO: No guardamos y marcamos como dado
-                    st.session_state.feedback_dado = True
-                    st.rerun()
-        else:
-            st.success("✅ Feedback registrado. El sistema de Aprendizaje por Refuerzo ha procesado tu respuesta.")
-            
-            if st.button("🔄 Generar otra recomendación"):
-                if "recomendacion_actual" in st.session_state:
-                    del st.session_state.recomendacion_actual 
-                st.session_state.feedback_dado = False
+    # SISTEMA DE FEEDBACK (RL)
+    st.markdown("#### ¿Qué tan útil fue esta recomendación?")
+    
+    if not st.session_state.feedback_dado:
+        col_f1, col_f2, _ = st.columns([1, 1, 4])
+        with col_f1:
+            if st.button("👍 Útil", use_container_width=True):
+                st.session_state.ejemplos_exitosos.append(st.session_state.recomendacion_actual)
+                st.session_state.feedback_dado = True
                 st.rerun()
+        with col_f2:
+            if st.button("👎 No útil", use_container_width=True):
+                st.session_state.feedback_dado = True
+                st.rerun()
+    else:
+        st.success("✅ Feedback registrado. El sistema de Aprendizaje por Refuerzo ha procesado tu respuesta.")
+        
+        if st.button("🔄 Generar otra recomendación"):
+            if "recomendacion_actual" in st.session_state:
+                del st.session_state.recomendacion_actual 
+            st.session_state.feedback_dado = False
+            st.rerun()
 
 # ==========================================
 # HISTORIAL DE PREDICCIONES
@@ -614,6 +628,8 @@ if st.session_state.historial:
     
     if st.button("Limpiar historial"):
         st.session_state.historial = []
+        if "resultado_prediccion" in st.session_state:
+            del st.session_state.resultado_prediccion
         st.rerun()
 
 # ==========================================

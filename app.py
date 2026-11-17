@@ -376,12 +376,21 @@ with st.form("formulario_paciente"):
     with col1:
         age = st.number_input("Edad (años)", min_value=None, max_value=120, value=None, step=1, placeholder="Ej: 50")
         gender = st.selectbox("Sexo", options=[None, "Hombre", "Mujer"], format_func=lambda x: "Seleccione..." if x is None else x)
-        bmi = st.number_input("IMC (kg/m²)", min_value=None, max_value=60.0, value=None, step=0.1, placeholder="Ej: 25.0")
+        weight = st.number_input("Peso (kg)", min_value=None, max_value=250.0, value=None, step=0.1, placeholder="Ej: 70.0")
         hypertension = st.selectbox("¿Tiene hipertensión?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
     
     with col2:
+        height = st.number_input("Altura (cm)", min_value=None, max_value=250.0, value=None, step=0.1, placeholder="Ej: 170.0")
         heart_disease = st.selectbox("¿Tiene enfermedad cardíaca?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
-        avg_glucose = st.number_input("Glucosa promedio (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0")
+        
+        # Lógica del Checkbox para la Glucosa
+        no_glucosa = st.checkbox("No conozco mi nivel de glucosa")
+        if no_glucosa:
+            avg_glucose = 100.0
+            st.info("Se usará un valor promedio de 100 mg/dL para el cálculo.")
+        else:
+            avg_glucose = st.number_input("Glucosa promedio (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0", help="Puedes encontrar este valor en tu examen de sangre.")
+
         ever_married = st.selectbox("¿Está casado/a?", options=[None, "Sí", "No"], format_func=lambda x: "Seleccione..." if x is None else x)
         work_type = st.selectbox("Tipo de trabajo", options=[None, "Privado", "Independiente", "Empleado público", "Niño/a", "Nunca ha trabajado"], format_func=lambda x: "Seleccione..." if x is None else x)
     
@@ -399,10 +408,11 @@ if boton:
     campos_faltantes = []
     if age is None: campos_faltantes.append("Edad")
     if gender is None: campos_faltantes.append("Sexo")
-    if bmi is None: campos_faltantes.append("IMC")
+    if weight is None: campos_faltantes.append("Peso")
+    if height is None: campos_faltantes.append("Altura")
     if hypertension is None: campos_faltantes.append("Hipertensión")
     if heart_disease is None: campos_faltantes.append("Enfermedad cardíaca")
-    if avg_glucose is None: campos_faltantes.append("Glucosa promedio")
+    if not no_glucosa and avg_glucose is None: campos_faltantes.append("Glucosa promedio")
     if ever_married is None: campos_faltantes.append("Estado civil")
     if work_type is None: campos_faltantes.append("Tipo de trabajo")
     if residence is None: campos_faltantes.append("Residencia")
@@ -413,6 +423,10 @@ if boton:
     else:
         # Spinner de carga
         with st.spinner("Analizando datos del paciente..."):
+            # Calcular el IMC internamente
+            altura_metros = height / 100.0
+            bmi = weight / (altura_metros ** 2)
+
             gender_map = {"Hombre": "Male", "Mujer": "Female"}
             married_map = {"Sí": "Yes", "No": "No"}
             work_map = {
@@ -435,7 +449,7 @@ if boton:
                 'hypertension': hypertension,
                 'heart_disease': heart_disease,
                 'avg_glucose_level': avg_glucose,
-                'bmi': bmi,
+                'bmi': bmi, # Aquí usamos el IMC calculado
                 'gender_Male': 1 if gender_map[gender] == "Male" else 0,
                 'ever_married_Yes': 1 if married_map[ever_married] == "Yes" else 0,
                 'work_type_Never_worked': 1 if work_map[work_type] == "Never_worked" else 0,
@@ -508,6 +522,8 @@ if boton:
             "Hora": datetime.now().strftime("%H:%M:%S"),
             "Edad": age,
             "Sexo": gender,
+            "Peso (kg)": f"{weight:.1f}",
+            "Altura (cm)": f"{height:.1f}",
             "IMC": f"{bmi:.1f}",
             "Glucosa": f"{avg_glucose:.1f}",
             "Probabilidad": f"{porcentaje:.2f}%",

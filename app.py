@@ -6,6 +6,7 @@ import pickle
 import tensorflow as tf
 import base64
 from datetime import datetime
+from groq import Groq
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -15,6 +16,67 @@ st.set_page_config(
     page_icon="🫀",
     layout="wide"
 )
+
+# ==========================================
+# CONFIGURACIÓN LLM (GROQ) Y RL
+# ==========================================
+# Lee la clave de forma segura desde Streamlit Secrets
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except:
+    GROQ_API_KEY = "FALTA_CONFIGURAR_SECRET" # Si no está en Secrets, avisará
+
+client = Groq(api_key=GROQ_API_KEY)
+
+# Memoria para el Aprendizaje por Refuerzo (Few-Shot dinámico)
+if "ejemplos_exitosos" not in st.session_state:
+    st.session_state.ejemplos_exitosos = []
+if "feedback_dado" not in st.session_state:
+    st.session_state.feedback_dado = False
+
+def generar_recomendacion_llm(categoria, factores, edad, sexo):
+    """Genera una recomendación médica con LLM (Groq/Llama 3)."""
+    contexto_paciente = f"Paciente de {edad} años, sexo {sexo}. "
+    contexto_paciente += f"Clasificación de riesgo cardiovascular: {categoria}. "
+    
+    if factores:
+        contexto_paciente += f"Factores de riesgo detectados: {', '.join(factores)}. "
+    else:
+        contexto_paciente += "No se detectaron factores de riesgo clínicos graves. "
+
+    # APLICACIÓN DEL RL: Inyectamos feedback positivo previo
+    instruccion_rl = ""
+    if st.session_state.ejemplos_exitosos:
+        instruccion_rl = "Ten en cuenta que a los usuarios les han gustado recomendaciones con este estilo:\n"
+        for ej in st.session_state.ejemplos_exitosos[-2:]: 
+            instruccion_rl += f"- \"{ej}\"\n"
+
+    prompt = f"""
+    Eres un médico cardiólogo experto. Basado en estos datos clínicos:
+    {contexto_paciente}
+    
+    Genera una recomendación médica personalizada y empática.
+    {instruccion_rl}
+    
+    Reglas ESTRICTAS:
+    1. El texto DEBE tener más de 200 caracteres (aprox. 3 o 4 oraciones).
+    2. No uses formato Markdown, solo texto plano.
+    3. Sé claro y directo, pero mantén un tono profesional y tranquilizador.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Eres un asistente médico experto en prevención cardiovascular."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        return f"Error al conectar con el LLM: {str(e)}. (Verifica tu API Key en los Secrets de Streamlit)."
 
 # ==========================================
 # ESTADO DE SESIÓN
@@ -289,7 +351,7 @@ st.markdown(f"""
         text-align: center;
         font-style: italic;
     ">
-        Proyecto de Simulación — Redes Neuronales Artificiales
+        Proyecto de Simulación — Redes Neuronales Artificiales + LLM + RL
     </p>
     <p style="
         color: {banner_desc} !important;
@@ -433,6 +495,11 @@ if boton:
             "Categoría": categoria
         })
         
+        # Reiniciar el estado del LLM para esta nueva predicción
+        if "recomendacion_actual" in st.session_state:
+            del st.session_state.recomendacion_actual
+        st.session_state.feedback_dado = False
+
         # ==========================================
         # MOSTRAR RESULTADOS
         # ==========================================
@@ -490,6 +557,51 @@ if boton:
         # --- Datos ingresados ---
         with st.expander("Ver datos ingresados"):
             st.dataframe(df_input.T.rename(columns={0: "Valor"}))
+
+        # ==========================================
+        # NUEVO: SECCIÓN LLM + RL (RECOMENDACIÓN)
+        # ==========================================
+        st.markdown("---")
+        st.header("🩺 Recomendación Médica Generada por IA")
+        st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
+        
+        if "recomendacion_actual" not in st.session_state:
+            with st.spinner("Generando recomendación personalizada con IA..."):
+                st.session_state.recomendacion_actual = generar_recomendacion_llm(
+                    categoria, factores, age, gender
+                )
+                st.session_state.feedback_dado = False
+
+        # Mostrar la recomendación
+        st.info(st.session_state.recomendacion_actual)
+
+        # Mostrar longitud (para verificar requisito del profe de >200)
+        st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
+
+        # SISTEMA DE FEEDBACK (RL)
+        st.markdown("#### ¿Qué tan útil fue esta recomendación?")
+        
+        if not st.session_state.feedback_dado:
+            col_f1, col_f2, _ = st.columns([1, 1, 4])
+            with col_f1:
+                if st.button("👍 Útil", use_container_width=True):
+                    # RECOMPENSA POSITIVA: Guardamos en memoria para el RL
+                    st.session_state.ejemplos_exitosos.append(st.session_state.recomendacion_actual)
+                    st.session_state.feedback_dado = True
+                    st.rerun()
+            with col_f2:
+                if st.button("👎 No útil", use_container_width=True):
+                    # CASTIGO: No guardamos y marcamos como dado
+                    st.session_state.feedback_dado = True
+                    st.rerun()
+        else:
+            st.success("✅ Feedback registrado. El sistema de Aprendizaje por Refuerzo ha procesado tu respuesta.")
+            
+            if st.button("🔄 Generar otra recomendación"):
+                if "recomendacion_actual" in st.session_state:
+                    del st.session_state.recomendacion_actual 
+                st.session_state.feedback_dado = False
+                st.rerun()
 
 # ==========================================
 # HISTORIAL DE PREDICCIONES

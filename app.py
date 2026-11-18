@@ -6,7 +6,10 @@ import pickle
 import tensorflow as tf
 import base64
 from datetime import datetime
-import time # NUEVO: Para las animaciones
+import time
+import io # NUEVO: Para generar el PDF en memoria
+from fpdf import FPDF # NUEVO: Para el PDF
+import plotly.graph_objects as go # NUEVO: Para el gráfico de radar
 from groq import Groq
 
 # ==========================================
@@ -76,6 +79,62 @@ def generar_recomendacion_llm(categoria, factores, edad, sexo):
         return completion.choices[0].message.content
     except Exception as e:
         return f"Error al conectar con el LLM: {str(e)}. (Verifica tu API Key en los Secrets de Streamlit)."
+
+# ==========================================
+# NUEVO: FUNCIÓN PARA GENERAR EL PDF
+# ==========================================
+def generar_pdf(res, recomendacion):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Título
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "Reporte de Riesgo Cardiovascular", ln=True, align='C')
+    pdf.ln(5)
+    
+    # Fecha
+    pdf.set_font("Arial", 'I', 10)
+    pdf.cell(0, 10, f"Fecha de generación: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='R')
+    pdf.ln(5)
+    
+    # Datos del paciente
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "Datos del Paciente:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 8, f"Edad: {res['age']} años", ln=True)
+    pdf.cell(0, 8, f"Sexo: {res['gender']}", ln=True)
+    pdf.cell(0, 8, f"IMC: {res['bmi']:.1f} kg/m2", ln=True)
+    pdf.cell(0, 8, f"Glucosa promedio: {res['avg_glucose']:.1f} mg/dL", ln=True)
+    pdf.ln(5)
+    
+    # Resultados de la predicción
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "Resultados de la Prediccion:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 8, f"Probabilidad de Riesgo: {res['porcentaje']:.2f}%", ln=True)
+    pdf.cell(0, 8, f"Categoria de Riesgo: {res['categoria']}", ln=True)
+    pdf.cell(0, 8, f"Confianza del modelo: {res['confianza']:.1f}%", ln=True)
+    pdf.ln(5)
+    
+    # Factores de riesgo
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "Factores de Riesgo Identificados:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    if res['factores']:
+        for _, texto in res['factores']:
+            pdf.cell(0, 8, f"- {texto}", ln=True)
+    else:
+        pdf.cell(0, 8, "No se identificaron factores de riesgo relevantes.", ln=True)
+    pdf.ln(5)
+    
+    # Recomendación LLM
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "Recomendacion Generada por IA:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    # Usamos multi_cell para textos largos
+    pdf.multi_cell(0, 8, recomendacion.encode('latin-1', 'replace').decode('latin-1'))
+    
+    return bytes(pdf.output())
 
 # ==========================================
 # ESTADO DE SESIÓN
@@ -173,7 +232,6 @@ if st.session_state.modo_oscuro:
     color_texto = "#ffffff"
     color_texto_secundario = "#a8d5e5"
     color_sidebar_bg = "rgba(10, 25, 47, 0.85)"
-    # Efecto Cristal para modo oscuro
     color_card_bg = "rgba(255, 255, 255, 0.05)"
     color_card_border = "rgba(255, 255, 255, 0.15)"
     color_input_bg = "rgba(255, 255, 255, 0.92)"
@@ -183,7 +241,6 @@ else:
     color_texto = "#0A192F"
     color_texto_secundario = "#1A5276"
     color_sidebar_bg = "rgba(240, 244, 248, 0.85)"
-    # Efecto Cristal para modo claro
     color_card_bg = "rgba(255, 255, 255, 0.7)"
     color_card_border = "rgba(10, 25, 47, 0.1)"
     color_input_bg = "rgba(255, 255, 255, 1.0)"
@@ -353,7 +410,7 @@ def cargar_recursos():
 modelo_prob, modelos_ensemble, scaler, columnas = cargar_recursos()
 
 # ==========================================
-# BANNER SUPERIOR (ADAPTATIVO AL MODO)
+# BANNER SUPERIOR
 # ==========================================
 if st.session_state.modo_oscuro:
     banner_bg = "linear-gradient(135deg, #0A2540 0%, #1A5276 100%)"
@@ -412,7 +469,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# FORMULARIO SIMPLIFICADO Y REACTIVO
+# FORMULARIO
 # ==========================================
 st.header("Datos del Paciente")
 
@@ -459,7 +516,7 @@ with st.container():
     boton = st.button("Predecir", use_container_width=True)
 
 # ==========================================
-# PREDICCIÓN Y LÓGICA DE ESTADO
+# PREDICCIÓN
 # ==========================================
 if boton:
     campos_faltantes = []
@@ -527,7 +584,6 @@ if boton:
                 
             porcentaje = prob * 100
             
-            # NUEVO: Factores de riesgo con iconos
             factores = []
             if age > 60:
                 factores.append(("⚠️", f"Edad avanzada ({age} años, mayor a 60)"))
@@ -544,15 +600,12 @@ if boton:
             elif smoking_map[smoking] == "formerly smoked":
                 factores.append(("🚬", "Historial de tabaquismo"))
         
-        # Guardamos la lista de textos (sin iconos) para el LLM
-        factores_texto = [f[1] for f in factores]
-        
         st.session_state.resultado_prediccion = {
             "prob": prob,
             "porcentaje": porcentaje,
             "categoria": categoria,
             "confianza": confianza,
-            "factores": factores, # Lista de tuplas (icono, texto)
+            "factores": factores,
             "df_input": df_input,
             "age": age,
             "gender": gender,
@@ -586,7 +639,6 @@ if "resultado_prediccion" in st.session_state:
     st.markdown("---")
     st.header("Resultado de la Predicción")
     
-    # Definimos colores para la barra
     if res['categoria'] == "Bajo":
         color = "#4CAF50"
         color_barra = "#4CAF50"
@@ -618,7 +670,6 @@ if "resultado_prediccion" in st.session_state:
         </div>
         """, unsafe_allow_html=True)
     
-    # NUEVO: Barra de progreso personalizada (Animada y de colores)
     st.markdown(f"""
     <div class="custom-progress-container">
         <div class="custom-progress-bar" style="width: {res['porcentaje']}%; background-color: {color_barra}; box-shadow: 0 0 10px {color_barra};"></div>
@@ -633,92 +684,46 @@ if "resultado_prediccion" in st.session_state:
     else:
         st.error("El paciente tiene alto riesgo cardiovascular. Se recomienda evaluación médica inmediata.")
     
-    st.markdown("### Factores de Riesgo Identificados")
-    if res['factores']:
-        for icono, texto in res['factores']:
-            st.markdown(f'<div class="factor-item"><span style="font-size:1.2rem;">{icono}</span> {texto}</div>', unsafe_allow_html=True)
-    else:
-        st.success("No se identificaron factores de riesgo clínicos relevantes.")
+    # --- SECCIÓN DE FACTORES Y GRÁFICO RADAR ---
+    col_fact, col_radar = st.columns([1, 1])
     
-    with st.expander("Ver datos ingresados"):
-        st.dataframe(res['df_input'].T.rename(columns={0: "Valor"}))
-
-    st.markdown("---")
-    st.header("🩺 Recomendación Médica Generada por IA")
-    st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
+    with col_fact:
+        st.markdown("### Factores de Riesgo")
+        if res['factores']:
+            for icono, texto in res['factores']:
+                st.markdown(f'<div class="factor-item"><span style="font-size:1.2rem;">{icono}</span> {texto}</div>', unsafe_allow_html=True)
+        else:
+            st.success("No se identificaron factores de riesgo clínicos relevantes.")
     
-    if "recomendacion_actual" not in st.session_state:
-        # NUEVO: Skeleton Loader animado
-        placeholder = st.empty()
-        placeholder.markdown('<div class="skeleton-loader"></div>', unsafe_allow_html=True)
+    with col_radar:
+        st.markdown("### Perfil de Riesgo (Radar)")
+        # Normalizamos los valores para el gráfico (escala 0 a 100)
+        # Edad (max 80), Glucosa (max 200), IMC (max 40), Presión (0 o 100), Corazón (0 o 100)
+        val_edad = min((res['age'] / 80) * 100, 100)
+        val_glucosa = min((res['avg_glucose'] / 200) * 100, 100)
+        val_imc = min((res['bmi'] / 40) * 100, 100)
+        val_presion = 100 if res['factores'] and any("Hipertensión" in f[1] for f in res['factores']) else 0
+        val_corazon = 100 if res['factores'] and any("cardíaca" in f[1] for f in res['factores']) else 0
         
-        # Generamos el texto (esto toma un par de segundos)
-        texto_llm = generar_recomendacion_llm(
-            res['categoria'], [f[1] for f in res['factores']], res['age'], res['gender']
-        )
+        categorias_radar = ['Edad', 'Glucosa', 'IMC', 'Hipertensión', 'Enf. Cardíaca']
+        valores_radar = [val_edad, val_glucosa, val_imc, val_presion, val_corazon]
         
-        # Guardamos y borramos el skeleton
-        st.session_state.recomendacion_actual = texto_llm
-        st.session_state.feedback_dado = False
-        placeholder.empty()
-        st.rerun() # Recargamos para mostrar el texto bonito
-
-    # Mostrar la recomendación
-    st.info(st.session_state.recomendacion_actual)
-    st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
-
-    st.markdown("#### ¿Qué tan útil fue esta recomendación?")
-    
-    if not st.session_state.feedback_dado:
-        col_f1, col_f2, _ = st.columns([1, 1, 4])
-        with col_f1:
-            if st.button("👍 Útil", use_container_width=True):
-                st.session_state.ejemplos_exitosos.append(st.session_state.recomendacion_actual)
-                st.session_state.feedback_dado = True
-                st.rerun()
-        with col_f2:
-            if st.button("👎 No útil", use_container_width=True):
-                st.session_state.feedback_dado = True
-                st.rerun()
-    else:
-        st.success("✅ Feedback registrado. El sistema de Aprendizaje por Refuerzo ha procesado tu respuesta.")
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=valores_radar,
+            theta=categorias_radar,
+            fill='toself',
+            fillcolor='rgba(231, 76, 60, 0.3)', # Rojo translúcido
+            line=dict(color='#E74C3C', width=2),
+            name='Perfil del Paciente'
+        ))
         
-        if st.button("🔄 Generar otra recomendación"):
-            if "recomendacion_actual" in st.session_state:
-                del st.session_state.recomendacion_actual 
-            st.session_state.feedback_dado = False
-            st.rerun()
-
-# ==========================================
-# HISTORIAL DE PREDICCIONES
-# ==========================================
-if st.session_state.historial:
-    st.markdown("---")
-    st.header("Historial de Predicciones (Sesión Actual)")
-    df_hist = pd.DataFrame(st.session_state.historial)
-    st.dataframe(df_hist, use_container_width=True)
-    
-    if st.button("Limpiar historial"):
-        st.session_state.historial = []
-        if "resultado_prediccion" in st.session_state:
-            del st.session_state.resultado_prediccion
-        st.rerun()
-
-# ==========================================
-# DISCLAIMER MÉDICO
-# ==========================================
-st.markdown("""
-<div class="disclaimer">
-    <strong>Aviso médico:</strong> Esta herramienta es un proyecto académico desarrollado 
-    con fines educativos. No reemplaza la evaluación, diagnóstico o tratamiento de un profesional 
-    de la salud. Los resultados son estimaciones basadas en un modelo de redes neuronales y no 
-    deben interpretarse como diagnóstico clínico. Consulte siempre a un médico ante cualquier 
-    duda sobre su salud cardiovascular.
-</div>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# PIE DE PÁGINA
-# ==========================================
-st.markdown("---")
-st.caption("Proyecto académico - Universidad de Córdoba - Facultad de Ingeniería - Ingeniería de Sistemas - 2026-2")
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 100], showticklabels=False),
+                bgcolor='rgba(0,0,0,0)' # Fondo transparente
+            ),
+            showlegend=False,
+            margin=dict(l=40, r=40, t=20, b=20),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',

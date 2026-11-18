@@ -6,6 +6,7 @@ import pickle
 import tensorflow as tf
 import base64
 from datetime import datetime
+import time # NUEVO: Para las animaciones
 from groq import Groq
 
 # ==========================================
@@ -166,25 +167,29 @@ except FileNotFoundError:
     fondo_css = "background-color: #0A192F;"
 
 # ==========================================
-# ESTILOS DINÁMICOS SEGÚN MODO
+# ESTILOS DINÁMICOS SEGÚN MODO (CON GLASSMORPHISM)
 # ==========================================
 if st.session_state.modo_oscuro:
     color_texto = "#ffffff"
     color_texto_secundario = "#a8d5e5"
-    color_sidebar_bg = "rgba(10, 25, 47, 0.95)"
-    color_card_bg = "rgba(255, 255, 255, 0.08)"
+    color_sidebar_bg = "rgba(10, 25, 47, 0.85)"
+    # Efecto Cristal para modo oscuro
+    color_card_bg = "rgba(255, 255, 255, 0.05)"
     color_card_border = "rgba(255, 255, 255, 0.15)"
     color_input_bg = "rgba(255, 255, 255, 0.92)"
     color_input_text = "#000000"
+    glass_filter = "backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);"
 else:
     color_texto = "#0A192F"
     color_texto_secundario = "#1A5276"
-    color_sidebar_bg = "rgba(240, 244, 248, 0.98)"
-    color_card_bg = "rgba(255, 255, 255, 0.95)"
-    color_card_border = "rgba(10, 25, 47, 0.15)"
+    color_sidebar_bg = "rgba(240, 244, 248, 0.85)"
+    # Efecto Cristal para modo claro
+    color_card_bg = "rgba(255, 255, 255, 0.7)"
+    color_card_border = "rgba(10, 25, 47, 0.1)"
     color_input_bg = "rgba(255, 255, 255, 1.0)"
     color_input_text = "#000000"
     fondo_css = "background-color: #F0F4F8;"
+    glass_filter = "backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 4px 15px rgba(0,0,0,0.05);"
 
 st.markdown(f"""
 <style>
@@ -209,14 +214,11 @@ st.markdown(f"""
     .stMetric label, .stMetric div {{
         color: {color_texto} !important;
     }}
-    
-    .stProgress > div > div > div > div {{
-        background-color: #4CAF50 !important;
-    }}
 
     section[data-testid="stSidebar"] {{
         background-color: {color_sidebar_bg} !important;
         border-right: 1px solid {color_card_border};
+        {glass_filter}
     }}
     
     section[data-testid="stSidebar"] h1,
@@ -243,15 +245,20 @@ st.markdown(f"""
         color: {color_texto} !important;
     }}
 
-    /* Tarjetas de resultado */
+    /* Tarjetas de resultado con Glassmorphism */
     .tarjeta-resultado {{
         background: {color_card_bg};
+        {glass_filter}
         border-radius: 16px;
         padding: 25px;
         border: 1px solid {color_card_border};
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
         text-align: center;
         margin-bottom: 15px;
+        transition: transform 0.3s ease;
+    }}
+    .tarjeta-resultado:hover {{
+        transform: translateY(-5px);
     }}
     .tarjeta-resultado .titulo {{
         font-size: 1.1rem;
@@ -267,6 +274,7 @@ st.markdown(f"""
     /* Disclaimer */
     .disclaimer {{
         background: {color_card_bg};
+        {glass_filter}
         border-left: 4px solid #D4AF37;
         border-radius: 8px;
         padding: 15px 20px;
@@ -276,15 +284,54 @@ st.markdown(f"""
         font-style: italic;
     }}
 
-    /* Factores de riesgo */
+    /* Factores de riesgo con hover */
     .factor-item {{
         background: {color_card_bg};
+        {glass_filter}
         border-radius: 8px;
-        padding: 8px 14px;
-        margin: 4px 0;
+        padding: 10px 14px;
+        margin: 6px 0;
         border-left: 3px solid #E74C3C;
         color: {color_texto};
-        font-size: 0.92rem;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+    }}
+    .factor-item:hover {{
+        background: rgba(231, 76, 60, 0.15);
+        border-left: 3px solid #FF5252;
+    }}
+
+    /* Barra de progreso personalizada */
+    .custom-progress-container {{
+        width: 100%;
+        background-color: rgba(150, 150, 150, 0.2);
+        border-radius: 10px;
+        margin: 15px 0;
+        height: 16px;
+        overflow: hidden;
+    }}
+    .custom-progress-bar {{
+        height: 100%;
+        border-radius: 10px;
+        transition: width 1.5s ease-in-out, background-color 0.5s;
+    }}
+
+    /* SKELETON LOADER para el LLM */
+    .skeleton-loader {{
+        background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.05) 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+        border-radius: 8px;
+        height: 100px;
+        width: 100%;
+        margin-bottom: 15px;
+    }}
+    @keyframes loading {{
+        0% {{ background-position: 200% 0; }}
+        100% {{ background-position: -200% 0; }}
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -382,19 +429,14 @@ with st.container():
     with col2:
         heart_disease = st.selectbox("¿Tiene enfermedad cardíaca?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
         
-        # --- Lógica del Toggle reactivo para la Glucosa ---
-        # Añadimos un poco de margen superior para que el toggle se alinee con el label del input
         st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
-        
         col_titulo, col_toggle = st.columns([3, 2])
         with col_titulo:
             st.markdown("**Glucosa promedio (mg/dL)**")
         with col_toggle:
             no_glucosa = st.toggle("No la conozco", help="Activa si no sabes tu nivel de glucosa.")
             
-        # Aquí aplicamos el HTML personalizado para el campo de texto inhabilitado
         if no_glucosa:
-            # Diseño idéntico al input de Streamlit, pero en gris (deshabilitado)
             st.markdown(f"""
             <div style="
                 background-color: rgba(240, 242, 246, 0.5); 
@@ -434,7 +476,6 @@ if boton:
         st.error(f"Por favor complete todos los campos. Faltan: {', '.join(campos_faltantes)}")
     else:
         with st.spinner("Analizando datos del paciente..."):
-            # Calcular el IMC internamente
             altura_metros = height / 100.0
             bmi = weight / (altura_metros ** 2)
 
@@ -446,7 +487,6 @@ if boton:
                 "Desconocido": "Unknown"
             }
             
-            # Rellenamos con valores por defecto (0) las columnas ocultas
             datos_dict = {
                 'age': age,
                 'hypertension': hypertension,
@@ -469,7 +509,6 @@ if boton:
             df_input = df_input.reindex(columns=columnas, fill_value=0)
             datos_escalados = scaler.transform(df_input)
             
-            # Usamos el ensemble para determinar la categoría y probabilidad
             predicciones_ens = []
             for m in modelos_ensemble:
                 predicciones_ens.append(m.predict(datos_escalados, verbose=0))
@@ -479,7 +518,6 @@ if boton:
             categoria = categorias[cat_idx]
             confianza = promedio_ens[0][cat_idx] * 100
             
-            # Calculamos la probabilidad
             if categoria == "Bajo":
                 prob = (confianza / 100) * 0.33
             elif categoria == "Medio":
@@ -489,30 +527,32 @@ if boton:
                 
             porcentaje = prob * 100
             
-            # Factores de riesgo heurísticos
+            # NUEVO: Factores de riesgo con iconos
             factores = []
             if age > 60:
-                factores.append(f"Edad avanzada ({age} años, mayor a 60)")
+                factores.append(("⚠️", f"Edad avanzada ({age} años, mayor a 60)"))
             if hypertension == 1:
-                factores.append("Hipertensión arterial")
+                factores.append(("🩸", "Hipertensión arterial"))
             if heart_disease == 1:
-                factores.append("Enfermedad cardíaca previa")
+                factores.append(("❤️", "Enfermedad cardíaca previa"))
             if avg_glucose > 140:
-                factores.append(f"Glucosa elevada ({avg_glucose:.1f} mg/dL, mayor a 140)")
+                factores.append(("🍬", f"Glucosa elevada ({avg_glucose:.1f} mg/dL)"))
             if bmi > 30:
-                factores.append(f"IMC elevado ({bmi:.1f} kg/m², mayor a 30)")
+                factores.append(("⚖️", f"IMC elevado ({bmi:.1f} kg/m²)"))
             if smoking_map[smoking] == "smokes":
-                factores.append("Tabaquismo activo")
+                factores.append(("🚬", "Tabaquismo activo"))
             elif smoking_map[smoking] == "formerly smoked":
-                factores.append("Historial de tabaquismo")
+                factores.append(("🚬", "Historial de tabaquismo"))
         
-        # Guardar TODO en la sesión
+        # Guardamos la lista de textos (sin iconos) para el LLM
+        factores_texto = [f[1] for f in factores]
+        
         st.session_state.resultado_prediccion = {
             "prob": prob,
             "porcentaje": porcentaje,
             "categoria": categoria,
             "confianza": confianza,
-            "factores": factores,
+            "factores": factores, # Lista de tuplas (icono, texto)
             "df_input": df_input,
             "age": age,
             "gender": gender,
@@ -520,7 +560,6 @@ if boton:
             "avg_glucose": avg_glucose
         }
         
-        # Guardar en historial
         st.session_state.historial.append({
             "Hora": datetime.now().strftime("%H:%M:%S"),
             "Edad": age,
@@ -547,12 +586,16 @@ if "resultado_prediccion" in st.session_state:
     st.markdown("---")
     st.header("Resultado de la Predicción")
     
+    # Definimos colores para la barra
     if res['categoria'] == "Bajo":
         color = "#4CAF50"
+        color_barra = "#4CAF50"
     elif res['categoria'] == "Medio":
         color = "#FF9800"
+        color_barra = "#FF9800"
     else:
         color = "#E74C3C"
+        color_barra = "#E74C3C"
     
     col_r1, col_r2 = st.columns(2)
     
@@ -575,7 +618,12 @@ if "resultado_prediccion" in st.session_state:
         </div>
         """, unsafe_allow_html=True)
     
-    st.progress(float(res['prob']))
+    # NUEVO: Barra de progreso personalizada (Animada y de colores)
+    st.markdown(f"""
+    <div class="custom-progress-container">
+        <div class="custom-progress-bar" style="width: {res['porcentaje']}%; background-color: {color_barra}; box-shadow: 0 0 10px {color_barra};"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("### Interpretación")
     if res['categoria'] == "Bajo":
@@ -587,8 +635,8 @@ if "resultado_prediccion" in st.session_state:
     
     st.markdown("### Factores de Riesgo Identificados")
     if res['factores']:
-        for f in res['factores']:
-            st.markdown(f'<div class="factor-item">{f}</div>', unsafe_allow_html=True)
+        for icono, texto in res['factores']:
+            st.markdown(f'<div class="factor-item"><span style="font-size:1.2rem;">{icono}</span> {texto}</div>', unsafe_allow_html=True)
     else:
         st.success("No se identificaron factores de riesgo clínicos relevantes.")
     
@@ -600,12 +648,22 @@ if "resultado_prediccion" in st.session_state:
     st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
     
     if "recomendacion_actual" not in st.session_state:
-        with st.spinner("Generando recomendación personalizada con IA..."):
-            st.session_state.recomendacion_actual = generar_recomendacion_llm(
-                res['categoria'], res['factores'], res['age'], res['gender']
-            )
-            st.session_state.feedback_dado = False
+        # NUEVO: Skeleton Loader animado
+        placeholder = st.empty()
+        placeholder.markdown('<div class="skeleton-loader"></div>', unsafe_allow_html=True)
+        
+        # Generamos el texto (esto toma un par de segundos)
+        texto_llm = generar_recomendacion_llm(
+            res['categoria'], [f[1] for f in res['factores']], res['age'], res['gender']
+        )
+        
+        # Guardamos y borramos el skeleton
+        st.session_state.recomendacion_actual = texto_llm
+        st.session_state.feedback_dado = False
+        placeholder.empty()
+        st.rerun() # Recargamos para mostrar el texto bonito
 
+    # Mostrar la recomendación
     st.info(st.session_state.recomendacion_actual)
     st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
 

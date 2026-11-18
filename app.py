@@ -33,7 +33,6 @@ if "feedback_dado" not in st.session_state:
     st.session_state.feedback_dado = False
 
 def generar_recomendacion_llm(categoria, factores, edad, sexo):
-    """Genera una recomendación médica humanizada con LLM (Groq)."""
     contexto_paciente = f"Paciente de {edad} años, sexo {sexo}. "
     contexto_paciente += f"Nivel de riesgo cardiovascular: {categoria}. "
     
@@ -370,10 +369,6 @@ st.markdown(f"""
 # ==========================================
 st.header("Datos del Paciente")
 
-# Nota: Para que el Toggle de la glucosa funcione en tiempo real, 
-# la parte del formulario que lo contiene debe estar fuera de st.form() o usar st.fragment.
-# Aquí organizamos todo usando st.container() para mantenerlo agrupado y funcional.
-
 with st.container():
     col1, col2 = st.columns(2)
     
@@ -387,17 +382,34 @@ with st.container():
     with col2:
         heart_disease = st.selectbox("¿Tiene enfermedad cardíaca?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
         
-        # Lógica del Toggle reactivo para la Glucosa
-        col_g1, col_g2 = st.columns([3, 1])
-        with col_g2:
-            no_glucosa = st.toggle("No la conozco", help="Activa esta opción si no sabes tu nivel de glucosa.")
+        # --- Lógica del Toggle reactivo para la Glucosa ---
+        # Añadimos un poco de margen superior para que el toggle se alinee con el label del input
+        st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+        
+        col_titulo, col_toggle = st.columns([3, 2])
+        with col_titulo:
+            st.markdown("**Glucosa promedio (mg/dL)**")
+        with col_toggle:
+            no_glucosa = st.toggle("No la conozco", help="Activa si no sabes tu nivel de glucosa.")
             
-        with col_g1:
-            if no_glucosa:
-                st.number_input("Glucosa (mg/dL)", value=100.0, disabled=True)
-                avg_glucose = 100.0
-            else:
-                avg_glucose = st.number_input("Glucosa (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0")
+        # Aquí aplicamos el HTML personalizado para el campo de texto inhabilitado
+        if no_glucosa:
+            # Diseño idéntico al input de Streamlit, pero en gris (deshabilitado)
+            st.markdown(f"""
+            <div style="
+                background-color: rgba(240, 242, 246, 0.5); 
+                border: 1px solid rgba(250, 250, 250, 0.2); 
+                border-radius: 0.5rem; 
+                padding: 0.5rem 1rem; 
+                color: #888888;
+                margin-bottom: 15px;
+            ">
+                100.0
+            </div>
+            """, unsafe_allow_html=True)
+            avg_glucose = 100.0
+        else:
+            avg_glucose = st.number_input("", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0", label_visibility="collapsed")
 
         smoking = st.selectbox("Estado de tabaquismo", options=[None, "Nunca ha fumado", "Fumó anteriormente", "Fuma actualmente", "Desconocido"], format_func=lambda x: "Seleccione..." if x is None else x)
     

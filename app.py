@@ -7,9 +7,9 @@ import tensorflow as tf
 import base64
 from datetime import datetime
 import time
-import io # NUEVO: Para generar el PDF en memoria
-from fpdf import FPDF # NUEVO: Para el PDF
-import plotly.graph_objects as go # NUEVO: Para el gráfico de radar
+import io 
+from fpdf import FPDF 
+import plotly.graph_objects as go 
 from groq import Groq
 
 # ==========================================
@@ -81,23 +81,20 @@ def generar_recomendacion_llm(categoria, factores, edad, sexo):
         return f"Error al conectar con el LLM: {str(e)}. (Verifica tu API Key en los Secrets de Streamlit)."
 
 # ==========================================
-# NUEVO: FUNCIÓN PARA GENERAR EL PDF
+# FUNCIÓN PARA GENERAR EL PDF
 # ==========================================
 def generar_pdf(res, recomendacion):
     pdf = FPDF()
     pdf.add_page()
     
-    # Título
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, "Reporte de Riesgo Cardiovascular", ln=True, align='C')
     pdf.ln(5)
     
-    # Fecha
     pdf.set_font("Arial", 'I', 10)
-    pdf.cell(0, 10, f"Fecha de generación: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='R')
+    pdf.cell(0, 10, f"Fecha de generacion: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='R')
     pdf.ln(5)
     
-    # Datos del paciente
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, "Datos del Paciente:", ln=True)
     pdf.set_font("Arial", '', 11)
@@ -107,7 +104,6 @@ def generar_pdf(res, recomendacion):
     pdf.cell(0, 8, f"Glucosa promedio: {res['avg_glucose']:.1f} mg/dL", ln=True)
     pdf.ln(5)
     
-    # Resultados de la predicción
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, "Resultados de la Prediccion:", ln=True)
     pdf.set_font("Arial", '', 11)
@@ -116,7 +112,6 @@ def generar_pdf(res, recomendacion):
     pdf.cell(0, 8, f"Confianza del modelo: {res['confianza']:.1f}%", ln=True)
     pdf.ln(5)
     
-    # Factores de riesgo
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, "Factores de Riesgo Identificados:", ln=True)
     pdf.set_font("Arial", '', 11)
@@ -127,12 +122,12 @@ def generar_pdf(res, recomendacion):
         pdf.cell(0, 8, "No se identificaron factores de riesgo relevantes.", ln=True)
     pdf.ln(5)
     
-    # Recomendación LLM
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, "Recomendacion Generada por IA:", ln=True)
     pdf.set_font("Arial", '', 11)
-    # Usamos multi_cell para textos largos
-    pdf.multi_cell(0, 8, recomendacion.encode('latin-1', 'replace').decode('latin-1'))
+    # Limpiamos caracteres raros para el PDF
+    texto_limpio = recomendacion.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 8, texto_limpio)
     
     return bytes(pdf.output())
 
@@ -208,7 +203,7 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# FONDO CON IMAGEN + OVERLAY (SOLO MODO OSCURO)
+# FONDO CON IMAGEN + OVERLAY
 # ==========================================
 try:
     with open("fondo1.png", "rb") as f:
@@ -226,7 +221,7 @@ except FileNotFoundError:
     fondo_css = "background-color: #0A192F;"
 
 # ==========================================
-# ESTILOS DINÁMICOS SEGÚN MODO (CON GLASSMORPHISM)
+# ESTILOS DINÁMICOS (GLASSMORPHISM)
 # ==========================================
 if st.session_state.modo_oscuro:
     color_texto = "#ffffff"
@@ -302,7 +297,6 @@ st.markdown(f"""
         color: {color_texto} !important;
     }}
 
-    /* Tarjetas de resultado con Glassmorphism */
     .tarjeta-resultado {{
         background: {color_card_bg};
         {glass_filter}
@@ -328,7 +322,6 @@ st.markdown(f"""
         color: {color_texto};
     }}
 
-    /* Disclaimer */
     .disclaimer {{
         background: {color_card_bg};
         {glass_filter}
@@ -341,7 +334,6 @@ st.markdown(f"""
         font-style: italic;
     }}
 
-    /* Factores de riesgo con hover */
     .factor-item {{
         background: {color_card_bg};
         {glass_filter}
@@ -361,7 +353,6 @@ st.markdown(f"""
         border-left: 3px solid #FF5252;
     }}
 
-    /* Barra de progreso personalizada */
     .custom-progress-container {{
         width: 100%;
         background-color: rgba(150, 150, 150, 0.2);
@@ -376,7 +367,6 @@ st.markdown(f"""
         transition: width 1.5s ease-in-out, background-color 0.5s;
     }}
 
-    /* SKELETON LOADER para el LLM */
     .skeleton-loader {{
         background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.05) 75%);
         background-size: 200% 100%;
@@ -697,8 +687,6 @@ if "resultado_prediccion" in st.session_state:
     
     with col_radar:
         st.markdown("### Perfil de Riesgo (Radar)")
-        # Normalizamos los valores para el gráfico (escala 0 a 100)
-        # Edad (max 80), Glucosa (max 200), IMC (max 40), Presión (0 o 100), Corazón (0 o 100)
         val_edad = min((res['age'] / 80) * 100, 100)
         val_glucosa = min((res['avg_glucose'] / 200) * 100, 100)
         val_imc = min((res['bmi'] / 40) * 100, 100)
@@ -713,7 +701,7 @@ if "resultado_prediccion" in st.session_state:
             r=valores_radar,
             theta=categorias_radar,
             fill='toself',
-            fillcolor='rgba(231, 76, 60, 0.3)', # Rojo translúcido
+            fillcolor='rgba(231, 76, 60, 0.3)',
             line=dict(color='#E74C3C', width=2),
             name='Perfil del Paciente'
         ))
@@ -721,9 +709,105 @@ if "resultado_prediccion" in st.session_state:
         fig.update_layout(
             polar=dict(
                 radialaxis=dict(visible=True, range=[0, 100], showticklabels=False),
-                bgcolor='rgba(0,0,0,0)' # Fondo transparente
+                bgcolor='rgba(0,0,0,0)'
             ),
             showlegend=False,
             margin=dict(l=40, r=40, t=20, b=20),
             paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("Ver datos ingresados"):
+        st.dataframe(res['df_input'].T.rename(columns={0: "Valor"}))
+
+    # ==========================================
+    # LLM + RL (RECOMENDACIÓN)
+    # ==========================================
+    st.markdown("---")
+    st.header("🩺 Recomendación Médica Generada por IA")
+    st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
+    
+    if "recomendacion_actual" not in st.session_state:
+        placeholder = st.empty()
+        placeholder.markdown('<div class="skeleton-loader"></div>', unsafe_allow_html=True)
+        
+        texto_llm = generar_recomendacion_llm(
+            res['categoria'], [f[1] for f in res['factores']], res['age'], res['gender']
+        )
+        
+        st.session_state.recomendacion_actual = texto_llm
+        st.session_state.feedback_dado = False
+        placeholder.empty()
+        st.rerun()
+
+    st.info(st.session_state.recomendacion_actual)
+    st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
+
+    # --- NUEVO: BOTÓN PARA DESCARGAR PDF ---
+    # Solo se muestra si la recomendación ya fue generada
+    if "recomendacion_actual" in st.session_state:
+        pdf_bytes = generar_pdf(res, st.session_state.recomendacion_actual)
+        st.download_button(
+            label="📄 Descargar Reporte Médico (PDF)",
+            data=pdf_bytes,
+            file_name=f"Reporte_Riesgo_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+    st.markdown("#### ¿Qué tan útil fue esta recomendación?")
+    
+    if not st.session_state.feedback_dado:
+        col_f1, col_f2, _ = st.columns([1, 1, 4])
+        with col_f1:
+            if st.button("👍 Útil", use_container_width=True):
+                st.session_state.ejemplos_exitosos.append(st.session_state.recomendacion_actual)
+                st.session_state.feedback_dado = True
+                st.rerun()
+        with col_f2:
+            if st.button("👎 No útil", use_container_width=True):
+                st.session_state.feedback_dado = True
+                st.rerun()
+    else:
+        st.success("✅ Feedback registrado. El sistema de Aprendizaje por Refuerzo ha procesado tu respuesta.")
+        
+        if st.button("🔄 Generar otra recomendación"):
+            if "recomendacion_actual" in st.session_state:
+                del st.session_state.recomendacion_actual 
+            st.session_state.feedback_dado = False
+            st.rerun()
+
+# ==========================================
+# HISTORIAL DE PREDICCIONES
+# ==========================================
+if st.session_state.historial:
+    st.markdown("---")
+    st.header("Historial de Predicciones (Sesión Actual)")
+    df_hist = pd.DataFrame(st.session_state.historial)
+    st.dataframe(df_hist, use_container_width=True)
+    
+    if st.button("Limpiar historial"):
+        st.session_state.historial = []
+        if "resultado_prediccion" in st.session_state:
+            del st.session_state.resultado_prediccion
+        st.rerun()
+
+# ==========================================
+# DISCLAIMER MÉDICO
+# ==========================================
+st.markdown("""
+<div class="disclaimer">
+    <strong>Aviso médico:</strong> Esta herramienta es un proyecto académico desarrollado 
+    con fines educativos. No reemplaza la evaluación, diagnóstico o tratamiento de un profesional 
+    de la salud. Los resultados son estimaciones basadas en un modelo de redes neuronales y no 
+    deben interpretarse como diagnóstico clínico. Consulte siempre a un médico ante cualquier 
+    duda sobre su salud cardiovascular.
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# PIE DE PÁGINA
+# ==========================================
+st.markdown("---")
+st.caption("Proyecto académico - Universidad de Córdoba - Facultad de Ingeniería - Ingeniería de Sistemas - 2026-2")

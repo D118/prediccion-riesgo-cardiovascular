@@ -1,4 +1,4 @@
-import streamlit as st
+iimport streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
@@ -366,11 +366,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# FORMULARIO SIMPLIFICADO
+# FORMULARIO SIMPLIFICADO Y REACTIVO
 # ==========================================
 st.header("Datos del Paciente")
 
-with st.form("formulario_paciente"):
+# Nota: Para que el Toggle de la glucosa funcione en tiempo real, 
+# la parte del formulario que lo contiene debe estar fuera de st.form() o usar st.fragment.
+# Aquí organizamos todo usando st.container() para mantenerlo agrupado y funcional.
+
+with st.container():
     col1, col2 = st.columns(2)
     
     with col1:
@@ -383,17 +387,22 @@ with st.form("formulario_paciente"):
     with col2:
         heart_disease = st.selectbox("¿Tiene enfermedad cardíaca?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
         
-        no_glucosa = st.checkbox("No conozco mi nivel de glucosa")
-        if no_glucosa:
-            avg_glucose = 100.0
-            st.info("Se usará un valor promedio de 100 mg/dL para el cálculo.")
-        else:
-            avg_glucose = st.number_input("Glucosa promedio (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0", help="Puedes encontrar este valor en tu examen de sangre.")
+        # Lógica del Toggle reactivo para la Glucosa
+        col_g1, col_g2 = st.columns([3, 1])
+        with col_g2:
+            no_glucosa = st.toggle("No la conozco", help="Activa esta opción si no sabes tu nivel de glucosa.")
+            
+        with col_g1:
+            if no_glucosa:
+                st.number_input("Glucosa (mg/dL)", value=100.0, disabled=True)
+                avg_glucose = 100.0
+            else:
+                avg_glucose = st.number_input("Glucosa (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0")
 
         smoking = st.selectbox("Estado de tabaquismo", options=[None, "Nunca ha fumado", "Fumó anteriormente", "Fuma actualmente", "Desconocido"], format_func=lambda x: "Seleccione..." if x is None else x)
     
     st.markdown("---")
-    boton = st.form_submit_button("Predecir", use_container_width=True)
+    boton = st.button("Predecir", use_container_width=True)
 
 # ==========================================
 # PREDICCIÓN Y LÓGICA DE ESTADO
@@ -412,7 +421,6 @@ if boton:
     if campos_faltantes:
         st.error(f"Por favor complete todos los campos. Faltan: {', '.join(campos_faltantes)}")
     else:
-        # Spinner de carga
         with st.spinner("Analizando datos del paciente..."):
             # Calcular el IMC internamente
             altura_metros = height / 100.0
@@ -426,8 +434,7 @@ if boton:
                 "Desconocido": "Unknown"
             }
             
-            # Rellenamos con valores por defecto (0) las columnas que quitamos del formulario
-            # (Work Type, Residencia, Casado, etc.)
+            # Rellenamos con valores por defecto (0) las columnas ocultas
             datos_dict = {
                 'age': age,
                 'hypertension': hypertension,
@@ -437,10 +444,10 @@ if boton:
                 'gender_Male': 1 if gender_map[gender] == "Male" else 0,
                 'ever_married_Yes': 0, 
                 'work_type_Never_worked': 0,
-                'work_type_Private': 1, # Asumimos Privado por defecto
+                'work_type_Private': 1,
                 'work_type_Self-employed': 0,
                 'work_type_children': 0,
-                'Residence_type_Urban': 1, # Asumimos Urbano por defecto
+                'Residence_type_Urban': 1,
                 'smoking_status_formerly smoked': 1 if smoking_map[smoking] == "formerly smoked" else 0,
                 'smoking_status_never smoked': 1 if smoking_map[smoking] == "never smoked" else 0,
                 'smoking_status_smokes': 1 if smoking_map[smoking] == "smokes" else 0,
@@ -460,7 +467,7 @@ if boton:
             categoria = categorias[cat_idx]
             confianza = promedio_ens[0][cat_idx] * 100
             
-            # Calculamos la probabilidad basándonos en la categoría y la confianza
+            # Calculamos la probabilidad
             if categoria == "Bajo":
                 prob = (confianza / 100) * 0.33
             elif categoria == "Medio":

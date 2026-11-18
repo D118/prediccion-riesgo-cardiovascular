@@ -366,24 +366,23 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# FORMULARIO
+# FORMULARIO SIMPLIFICADO
 # ==========================================
 st.header("Datos del Paciente")
 
 with st.form("formulario_paciente"):
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         age = st.number_input("Edad (años)", min_value=None, max_value=120, value=None, step=1, placeholder="Ej: 50")
         gender = st.selectbox("Sexo", options=[None, "Hombre", "Mujer"], format_func=lambda x: "Seleccione..." if x is None else x)
         weight = st.number_input("Peso (kg)", min_value=None, max_value=250.0, value=None, step=0.1, placeholder="Ej: 70.0")
+        height = st.number_input("Altura (cm)", min_value=None, max_value=250.0, value=None, step=0.1, placeholder="Ej: 170.0")
         hypertension = st.selectbox("¿Tiene hipertensión?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
     
     with col2:
-        height = st.number_input("Altura (cm)", min_value=None, max_value=250.0, value=None, step=0.1, placeholder="Ej: 170.0")
         heart_disease = st.selectbox("¿Tiene enfermedad cardíaca?", options=[None, 0, 1], format_func=lambda x: "Seleccione..." if x is None else ("No" if x == 0 else "Sí"))
         
-        # Lógica del Checkbox para la Glucosa
         no_glucosa = st.checkbox("No conozco mi nivel de glucosa")
         if no_glucosa:
             avg_glucose = 100.0
@@ -391,11 +390,6 @@ with st.form("formulario_paciente"):
         else:
             avg_glucose = st.number_input("Glucosa promedio (mg/dL)", min_value=None, max_value=300.0, value=None, step=0.1, placeholder="Ej: 100.0", help="Puedes encontrar este valor en tu examen de sangre.")
 
-        ever_married = st.selectbox("¿Está casado/a?", options=[None, "Sí", "No"], format_func=lambda x: "Seleccione..." if x is None else x)
-        work_type = st.selectbox("Tipo de trabajo", options=[None, "Privado", "Independiente", "Empleado público", "Niño/a", "Nunca ha trabajado"], format_func=lambda x: "Seleccione..." if x is None else x)
-    
-    with col3:
-        residence = st.selectbox("Tipo de residencia", options=[None, "Urbana", "Rural"], format_func=lambda x: "Seleccione..." if x is None else x)
         smoking = st.selectbox("Estado de tabaquismo", options=[None, "Nunca ha fumado", "Fumó anteriormente", "Fuma actualmente", "Desconocido"], format_func=lambda x: "Seleccione..." if x is None else x)
     
     st.markdown("---")
@@ -413,9 +407,6 @@ if boton:
     if hypertension is None: campos_faltantes.append("Hipertensión")
     if heart_disease is None: campos_faltantes.append("Enfermedad cardíaca")
     if not no_glucosa and avg_glucose is None: campos_faltantes.append("Glucosa promedio")
-    if ever_married is None: campos_faltantes.append("Estado civil")
-    if work_type is None: campos_faltantes.append("Tipo de trabajo")
-    if residence is None: campos_faltantes.append("Residencia")
     if smoking is None: campos_faltantes.append("Tabaquismo")
     
     if campos_faltantes:
@@ -428,15 +419,6 @@ if boton:
             bmi = weight / (altura_metros ** 2)
 
             gender_map = {"Hombre": "Male", "Mujer": "Female"}
-            married_map = {"Sí": "Yes", "No": "No"}
-            work_map = {
-                "Privado": "Private",
-                "Independiente": "Self-employed",
-                "Empleado público": "Govt_job",
-                "Niño/a": "children",
-                "Nunca ha trabajado": "Never_worked"
-            }
-            residence_map = {"Urbana": "Urban", "Rural": "Rural"}
             smoking_map = {
                 "Nunca ha fumado": "never smoked",
                 "Fumó anteriormente": "formerly smoked",
@@ -444,19 +426,21 @@ if boton:
                 "Desconocido": "Unknown"
             }
             
+            # Rellenamos con valores por defecto (0) las columnas que quitamos del formulario
+            # (Work Type, Residencia, Casado, etc.)
             datos_dict = {
                 'age': age,
                 'hypertension': hypertension,
                 'heart_disease': heart_disease,
                 'avg_glucose_level': avg_glucose,
-                'bmi': bmi, # Aquí usamos el IMC calculado
+                'bmi': bmi,
                 'gender_Male': 1 if gender_map[gender] == "Male" else 0,
-                'ever_married_Yes': 1 if married_map[ever_married] == "Yes" else 0,
-                'work_type_Never_worked': 1 if work_map[work_type] == "Never_worked" else 0,
-                'work_type_Private': 1 if work_map[work_type] == "Private" else 0,
-                'work_type_Self-employed': 1 if work_map[work_type] == "Self-employed" else 0,
-                'work_type_children': 1 if work_map[work_type] == "children" else 0,
-                'Residence_type_Urban': 1 if residence_map[residence] == "Urban" else 0,
+                'ever_married_Yes': 0, 
+                'work_type_Never_worked': 0,
+                'work_type_Private': 1, # Asumimos Privado por defecto
+                'work_type_Self-employed': 0,
+                'work_type_children': 0,
+                'Residence_type_Urban': 1, # Asumimos Urbano por defecto
                 'smoking_status_formerly smoked': 1 if smoking_map[smoking] == "formerly smoked" else 0,
                 'smoking_status_never smoked': 1 if smoking_map[smoking] == "never smoked" else 0,
                 'smoking_status_smokes': 1 if smoking_map[smoking] == "smokes" else 0,
@@ -503,7 +487,7 @@ if boton:
             elif smoking_map[smoking] == "formerly smoked":
                 factores.append("Historial de tabaquismo")
         
-        # Guardar TODO en la sesión para que no se borre al dar clic en feedback
+        # Guardar TODO en la sesión
         st.session_state.resultado_prediccion = {
             "prob": prob,
             "porcentaje": porcentaje,
@@ -530,14 +514,13 @@ if boton:
             "Categoría": categoria
         })
         
-        # Reiniciar el estado del LLM para esta nueva predicción
         if "recomendacion_actual" in st.session_state:
             del st.session_state.recomendacion_actual
         st.session_state.feedback_dado = False
-        st.rerun() # Recargamos para mostrar los resultados guardados
+        st.rerun()
 
 # ==========================================
-# MOSTRAR RESULTADOS (Lee del estado de sesión)
+# MOSTRAR RESULTADOS
 # ==========================================
 if "resultado_prediccion" in st.session_state:
     res = st.session_state.resultado_prediccion
@@ -545,7 +528,6 @@ if "resultado_prediccion" in st.session_state:
     st.markdown("---")
     st.header("Resultado de la Predicción")
     
-    # --- Tarjetas ---
     if res['categoria'] == "Bajo":
         color = "#4CAF50"
     elif res['categoria'] == "Medio":
@@ -576,7 +558,6 @@ if "resultado_prediccion" in st.session_state:
     
     st.progress(float(res['prob']))
     
-    # --- Interpretación ---
     st.markdown("### Interpretación")
     if res['categoria'] == "Bajo":
         st.info("El paciente tiene bajo riesgo cardiovascular. Se recomienda mantener hábitos saludables.")
@@ -585,7 +566,6 @@ if "resultado_prediccion" in st.session_state:
     else:
         st.error("El paciente tiene alto riesgo cardiovascular. Se recomienda evaluación médica inmediata.")
     
-    # --- Factores de riesgo ---
     st.markdown("### Factores de Riesgo Identificados")
     if res['factores']:
         for f in res['factores']:
@@ -593,13 +573,9 @@ if "resultado_prediccion" in st.session_state:
     else:
         st.success("No se identificaron factores de riesgo clínicos relevantes.")
     
-    # --- Datos ingresados ---
     with st.expander("Ver datos ingresados"):
         st.dataframe(res['df_input'].T.rename(columns={0: "Valor"}))
 
-    # ==========================================
-    # SECCIÓN LLM + RL (RECOMENDACIÓN)
-    # ==========================================
     st.markdown("---")
     st.header("🩺 Recomendación Médica Generada por IA")
     st.caption("Esta recomendación es generada automáticamente por un Modelo de Lenguaje (LLM) basado en tu predicción.")
@@ -611,13 +587,9 @@ if "resultado_prediccion" in st.session_state:
             )
             st.session_state.feedback_dado = False
 
-    # Mostrar la recomendación
     st.info(st.session_state.recomendacion_actual)
-
-    # Mostrar longitud
     st.caption(f"Longitud del texto: {len(st.session_state.recomendacion_actual)} caracteres (Requisito: >200).")
 
-    # SISTEMA DE FEEDBACK (RL)
     st.markdown("#### ¿Qué tan útil fue esta recomendación?")
     
     if not st.session_state.feedback_dado:
